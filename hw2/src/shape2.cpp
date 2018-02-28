@@ -10,7 +10,7 @@ const double PI = 3.14159265359;
 bool isMoving = false;
 
 //Functions
-void rotate (double angular_speed, double angle, bool clockwise);
+void rotate (double angular_speed, double angle, double linearSpeed, bool clockwise);
 double degrees2radians(double angle_in_degrees);
 
 int main(int argc, char ** argv)
@@ -29,11 +29,12 @@ int main(int argc, char ** argv)
 	/***********************************
 	ROTATION TEST
 	************************************/
-	rotate(degrees2radians(rotationSpeed), degrees2radians(150) , true);
-	rotate(degrees2radians(rotationSpeed*4.0), degrees2radians(180) , true);
-	rotate(degrees2radians(rotationSpeed*2.0), degrees2radians(300) , false);
-	rotate(degrees2radians(rotationSpeed*4.0), degrees2radians(180) , true);
-	rotate(degrees2radians(rotationSpeed), degrees2radians(150) , true);
+	rotate(degrees2radians(rotationSpeed), degrees2radians(95) , 0 , false);
+	rotate(degrees2radians(rotationSpeed), degrees2radians(150) , 1 , true);//Big
+	rotate(degrees2radians(rotationSpeed*4.0), degrees2radians(145), 1 , true);//small
+	rotate(degrees2radians(rotationSpeed*2.0), degrees2radians(300), 1 , false);//medium
+	rotate(degrees2radians(rotationSpeed*4.0), degrees2radians(145), 1 , true); //small
+	rotate(degrees2radians(rotationSpeed), degrees2radians(150), 1 , true); //big
 
 	//extra necessary stuff
 	loop_rate.sleep();
@@ -46,11 +47,11 @@ double degrees2radians(double angle_in_degrees){
 	return angle_in_degrees *PI /180.0;
 }
 
-void rotate (double angular_speed, double relative_angle, bool clockwise){
+void rotate (double angular_speed, double relative_angle, double linearSpeed, bool clockwise){
 
 	geometry_msgs::Twist vel_msg;
 	//set a random linear velocity in the x-axis
-	vel_msg.linear.x = 1;
+	vel_msg.linear.x = linearSpeed;
 	vel_msg.linear.y =0;
 	vel_msg.linear.z =0;
 	//set a random angular velocity in the y-axis
@@ -60,7 +61,7 @@ void rotate (double angular_speed, double relative_angle, bool clockwise){
 	if (clockwise)
 		vel_msg.angular.z =-abs(angular_speed);
 	else
-		vel_msg.angular.z =abs(angular_speed);
+		vel_msg.angular.z = abs(angular_speed);
 
 	double current_angle = 0.0;
 	double t0 = ros::Time::now().toSec();
@@ -72,7 +73,7 @@ void rotate (double angular_speed, double relative_angle, bool clockwise){
 		ros::spinOnce();
 		loop_rate.sleep();
 	}while(current_angle<relative_angle);
-
+	vel_msg.linear.x = 0;
 	vel_msg.angular.z =0;
 	velocity_publisher.publish(vel_msg);
 
