@@ -1,13 +1,15 @@
+#include "ros/ros.h"
+#include "geometry_msgs/Twist.h"
 #include <sstream>
 
-//A lot of this stuff is based from 'wiki.ros.org/turtlesim' youtube video tutorials
+using namespace std;
 
-//Global Variables
-ros::Publisher velocity_publisher; 	//topic to tell turtle where to go is /turtle1/cmd_vel
+ros::Publisher velocity_publisher;
 
+const double PI = 3.14159265359;
+bool isMoving = false;
 
 //Functions
-void poseCallback(const turtlesim::Pose::ConstPtr & pose_message);
 void rotate (double angular_speed, double angle, bool clockwise);
 double degrees2radians(double angle_in_degrees);
 
@@ -48,7 +50,7 @@ void rotate (double angular_speed, double relative_angle, bool clockwise){
 
 	geometry_msgs::Twist vel_msg;
 	//set a random linear velocity in the x-axis
-	vel_msg.linear.x = 0;
+	vel_msg.linear.x = 1;
 	vel_msg.linear.y =0;
 	vel_msg.linear.z =0;
 	//set a random angular velocity in the y-axis
