@@ -1,6 +1,8 @@
-#481Assignments
+# 481Assignments
 
-#hw2: how to run
+<br>
+
+## hw2: how to run
 
 1. 'hw2' is the package, just drag it in and 'catkin_make'
 2. Open 3 terminals
