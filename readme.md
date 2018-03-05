@@ -9,8 +9,7 @@
 4. Run "catkin_make" from the root of work space
 
 ### To run the “shapeX.cpp” (“X” represent 1 or 2):
-terminal 1: 
-	- Run the master node
+terminal 1: Run the master node
 ```
 roscore
 ```
