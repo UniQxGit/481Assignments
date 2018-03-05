@@ -24,11 +24,9 @@ rosrun turtlesim turtlesim_node
 
 terminal 3: Run shapeX
 ```
-catkin_make
 source devel/setup.bash
 rosrun hw2 shapeX
 ```
-README
 
 
 
