@@ -4,6 +4,7 @@
 
 #include <sstream>
 
+using namespace std;
 //A lot of this stuff is based from 'wiki.ros.org/turtlesim' youtube video tutorials
 
 //Global Variables
@@ -11,8 +12,11 @@ ros::Publisher velocity_publisher; 	//topic to tell turtle where to go is /turtl
 ros::Subscriber pose_subscriber;   	//topic to get current turtle position is /turtle1/pose
 turtlesim::Pose turtlesim_pose;    	//Current position of the turtle
 bool poseHasUpdated = false;		//Used to wait for initial pose data before moving
+const double PI = 3.14159265359;
 
 //Functions
+double degrees2radians(double angle_in_degrees);
+void rotate (double angular_speed, double relative_angle, double linearSpeed, bool clockwise);
 void poseCallback(const turtlesim::Pose::ConstPtr & pose_message);
 double getDistance(double x1, double y1, double x2, double y2);
 void move_goal (turtlesim::Pose goal_pose);
@@ -78,22 +82,38 @@ void move_goal (turtlesim::Pose goal_pose)
 	ros::Rate loop_rate(10);
 
 	//rotate the turtle first
-	do 
-	{
-		//The closer we are pointed in the direction of the 'goal_pose', angular velocity goes closer to 0
-		vel_msg.angular.x = 0;
-		vel_msg.angular.y = 0;
-		vel_msg.angular.z = 1.0 * (atan2(goal_pose.y-turtlesim_pose.y, goal_pose.x - turtlesim_pose.x) - turtlesim_pose.theta);
+	double current_angle = 0.0;
+	double starting_angle = turtlesim_pose.theta;
+	double t0 = ros::Time::now().toSec();
+	float targetRotation = atan2(goal_pose.y-turtlesim_pose.y, goal_pose.x - turtlesim_pose.x) - turtlesim_pose.theta;
+	double angular_speed = degrees2radians(50);
+
+	bool clockwise = (targetRotation<0);
+	vel_msg.angular.x = 0;
+	vel_msg.angular.y = 0;
+
+	if (clockwise)
+		vel_msg.angular.z = -abs(angular_speed);
+	else
+		vel_msg.angular.z = abs(angular_speed);
+
+	do{
+		double t1 = ros::Time::now().toSec();
+		current_angle = angular_speed * (t1-t0);
+		std::cout << "Target Rotation: " << (targetRotation*180/PI) 
+		<< " Speed: " << (angular_speed*180/PI) 
+		<< " CAngle: " << (current_angle*180/PI) 
+		<< " DTime:"  << (t1-t0)
+		<< std::endl;
+
 
 		velocity_publisher.publish(vel_msg);
 		ros::spinOnce();
 		loop_rate.sleep();
-
-		
-		//chosen tolerance for angular velocity is 0.001
-	} while (vel_msg.angular.z >= 0.001 || vel_msg.angular.z <= -0.001);
+	}while(current_angle<(abs(targetRotation))-degrees2radians(6));
 
 	vel_msg.angular.z = 0;
+	velocity_publisher.publish(vel_msg);
 
 	//make the turtle walk
 	do 
@@ -108,13 +128,47 @@ void move_goal (turtlesim::Pose goal_pose)
 		loop_rate.sleep();
 
 		//chosen tolerance for linear velocity is 0.05
-	} while (getDistance(turtlesim_pose.x, turtlesim_pose.y, goal_pose.x, goal_pose.y) > 0.05);
+	} while (getDistance(turtlesim_pose.x, turtlesim_pose.y, goal_pose.x, goal_pose.y) > .16);
 	
 	//make the turtle stop
 	vel_msg.linear.x = 0;
 	vel_msg.angular.z = 0;
 	velocity_publisher.publish(vel_msg);
 }
+
+void rotate (double angular_speed, double relative_angle, bool clockwise){
+
+	geometry_msgs::Twist vel_msg;
+	//set a random linear velocity in the x-axis
+	vel_msg.linear.x = 0;
+	vel_msg.linear.y =0;
+	vel_msg.linear.z =0;
+	//set a random angular velocity in the y-axis
+	vel_msg.angular.x = 0;
+	vel_msg.angular.y = 0;
+
+	if (clockwise)
+		vel_msg.angular.z =-abs(angular_speed);
+	else
+		vel_msg.angular.z = abs(angular_speed);
+
+	double current_angle = 0.0;
+	double t0 = ros::Time::now().toSec();
+	ros::Rate loop_rate(10);
+	do{
+		velocity_publisher.publish(vel_msg);
+		double t1 = ros::Time::now().toSec();
+		current_angle = angular_speed * (t1-t0);
+		ros::spinOnce();
+		loop_rate.sleep();
+	}while(current_angle<relative_angle);
+	vel_msg.linear.x = 0;
+	vel_msg.angular.z =0;
+	velocity_publisher.publish(vel_msg);
+
+}
+
+
 
 //------callback functions------
 
@@ -131,4 +185,8 @@ void poseCallback(const turtlesim::Pose::ConstPtr & pose_message)
 double getDistance(double x1, double y1, double x2, double y2)
 {
 	return sqrt(pow((x1-x2), 2) + pow ((y1-y2),2));
+}
+
+double degrees2radians(double angle_in_degrees){
+	return angle_in_degrees *PI /180.0;
 }
