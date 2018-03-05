@@ -8,7 +8,7 @@
 3. Create a folder “src” under the hw2 folder, and copy  "shape1.cpp", "shape2.cpp" into the src folder
 4. Run "catkin_make" from the root of work space
 
-# To run the “shapeX.cpp” (“X” represent 1 or 2):
+### To run the “shapeX.cpp” (“X” represent 1 or 2):
 terminal 1: 
 	- Run the master node
 ```
