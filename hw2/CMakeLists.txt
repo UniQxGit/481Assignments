@@ -201,3 +201,5 @@ include_directories(
 #shape1.cpp
 add_executable(shape1 src/shape1.cpp)
 target_link_libraries(shape1 ${catkin_LIBRARIES})
+add_executable(shape2 src/shape2.cpp)
+target_link_libraries(shape2 ${catkin_LIBRARIES})

@@ -1,26 +1,37 @@
-# 481Assignments
+# CPSC481 HW2
 
 <br>
 
-## hw2: how to run
+## Steps to Run:
+1. Create a package folder “hw2” in a ros work space, under the “src” folder
+2. Copy "CMakeLists.txt", "package,xml" into hw2 package folder
+3. Create a folder “src” under the hw2 folder, and copy  "shape1.cpp", "shape2.cpp" into the src folder
+4. Run "catkin_make" from the root of work space
 
-1. 'hw2' is the package, just drag it in and 'catkin_make'
-2. Open 3 terminals
-
-
-terminal 1: Run the master node
+# To run the “shapeX.cpp” (“X” represent 1 or 2):
+terminal 1: 
+	- Run the master node
 ```
 roscore
 ```
 
 terminal 2: Run turtlesim
 ```
+source devel/setup.bash
 rosmake turtlesim
 rosrun turtlesim turtlesim_node
 ```
 
-terminal 3: Run shape1
+terminal 3: Run shapeX
 ```
-rosrun hw2 shape1
+catkin_make
+source devel/setup.bash
+rosrun hw2 shapeX
 ```
+README
+
+
+
+
+
 
