@@ -34,6 +34,18 @@ struct Turtle {
 		pose.y = -1;
 	}
 
+	Turtle(string n)
+	{
+		parent = NULL;
+		name = n;
+		type = "";
+		hValue = 0;
+		gValue = 0;
+		fValue = 0;
+		pose.x = -1;
+		pose.y = -1;
+	}
+
 	string name;
 	string type;
 	double hValue;
@@ -43,7 +55,7 @@ struct Turtle {
 	turtlesim::Pose pose;
 
 	Turtle *parent;
-	vector<Turtle> children;
+	vector<Turtle *> children;
 };
 
 class Tree {
@@ -57,11 +69,11 @@ public:
 
 	void add(Turtle *parent,Turtle *node);
 	void printat(Turtle t);
+	//Turtle[] getPath(Turtle t); //Replace with search function
 	int getCount();
 	Turtle root;
 
 private:
-	
 	int count;
 };
 
@@ -81,11 +93,12 @@ void move_goal (turtlesim::Pose goal_pose);
 
 void Turtle::print()
 {
-	std::cout << "\nName: " << name << "\nType: " << type << "\nLocation: (" << pose.x << "," << pose.y << ")" << std::endl;
+	std::cout << "\nName: " << name << "\nPARENT: " << (parent!=NULL?parent->name:"NONE") << "\nType: " << type << "\nLocation: (" << pose.x << "," << pose.y << ")" << std::endl;
 	std::cout << "Children:" << std::endl;
 	for (int i = 0; i < children.size(); i++)
 	{
-		std::cout << "\tName: " << children[i].name << "\n\tType: " << children[i].type << "\n\tLocation: (" << children[i].pose.x << "," << children[i].pose.y << ")" << "\n\tF(n): " << f()  << "\n" << std::endl;
+		//children[i].print();
+		std::cout << "\tName: " << children[i]->name << "\n\tType: " << children[i]->type << "\n\tLocation: (" << children[i]->pose.x << "," << children[i]->pose.y << ")" << "\n\tF(n): " << f() << "\n\n" << std::endl;
 	}
 }
 
@@ -110,15 +123,17 @@ double Turtle::f()
 
 void Tree::add(Turtle *parent, Turtle *node)
 {
-	node->parent = new Turtle();
+	node->parent = new Turtle("EMPTY");
 	if(parent == NULL)
 	{
 		node->parent = &root;
-		root.children.push_back(*node);
+		root.children.push_back(node);
 	}else{
-		parent->children.push_back(*node);
+		parent->children.push_back(node);
 		node->parent = parent;
 	}
+	// std::cout << "\nAdding ";
+	// node->print();
 }
 
 int Tree::getCount()
@@ -129,11 +144,14 @@ int Tree::getCount()
 void Tree::printat(Turtle t)
 {
 	if(t.children.size() <= 0 )
+	{
+		std::cout << t.name << " has no children " << std::endl;
 		return;
+	}
 	t.print();
 	for(int i = 0; i < t.children.size(); i++)
 	{
-		printat(t.children[i]);
+		printat(*t.children[i]);
 	}
 }
 
@@ -155,10 +173,10 @@ void GetTurtles()
 void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, Tree *tree, Turtle *t)
 {
 	// after the initial update we don't need to worry anymore
-	if (!T_turtlesHasUpdated) 
+	if (!T_turtlesHasUpdated && t->pose.x == -1 && t->pose.y == -1) 
 	{
 
-		std::cout << "Updating " << t->type << " Turtle " << std::endl;
+		//std::cout << "Updating " << t->type << " Turtle " << std::endl;
 		turtlesim::Pose temp;
 
 		temp.x = pose_message->x;
@@ -167,10 +185,15 @@ void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, Tree *tree, T
 
 
 		t->pose = temp;
-		std::cout << "(" << t->pose.x << "," << t->pose.y << ")" << std::endl;
-		num_turtles_updated++;
+		
 		if(t->type == "T")
+		{
 			tree->add(NULL,t);
+
+			//Testing adding to tree
+			tree->add(t,new Turtle("TestChild1"));
+			tree->add(t,new Turtle("TestChild2"));
+		}
 		else if(t->type == "X")
 			xTurtles.push_back(*t);
 		//T_turtles[topic_num - 1] = temp;
@@ -181,6 +204,7 @@ void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, Tree *tree, T
 	{
 		T_turtlesHasUpdated = true;
 	}
+	num_turtles_updated++;
 }
 
 int main(int argc, char ** argv)
@@ -203,6 +227,7 @@ int main(int argc, char ** argv)
 
 	Tree tree;
 	Turtle *t;//, *tx;
+	bool foundT = false, foundX = false;
 
 	for (int i = 1; i <= alltopics.size(); i++) 
 	{
@@ -225,12 +250,15 @@ int main(int argc, char ** argv)
 		topic_stream3 << "/X" << i << "/pose";
 		string topic_string_X = topic_stream3.str();
 
-
+		foundT = false;
+		foundX = false;
+		
 		for(int j = 1; j <= alltopics.size(); j++)
 		{
 			//std::cout << "Checking : " << topic_string_X << " against " << alltopics[i].name << std::endl;
-			if (alltopics[j].name.compare(topic_string_T) == 0)
+			if (alltopics[j].name.compare(topic_string_T) == 0 && !foundT)
 			{
+				foundT = true;
 				// std::cout << "Found: " << name_stream_T.str() << std::endl;
 				t = new Turtle();
 				t->name = name_stream_T.str();
@@ -241,8 +269,9 @@ int main(int argc, char ** argv)
 
 
 
-			if (alltopics[j].name.compare(topic_string_X) == 0)
+			if (alltopics[j].name.compare(topic_string_X) == 0 && !foundX)
 			{
+				foundX = true;
 				// std::cout << "Found: " << name_stream_X.str() << std::endl;
 				t = new Turtle();
 				t->name = name_stream_X.str();
@@ -265,7 +294,7 @@ int main(int argc, char ** argv)
 	//hw3 stuff
 	//show_all_turts();
 
-	std::cout << "PRINTING X TURTLES: " << std::endl;
+	std::cout << "\nPRINTING X TURTLES: " << std::endl;
 	for (int i = 0; i < xTurtles.size(); i++)
 	{
 		std::cout << "\nName: " << xTurtles[i].name << "\nType: " << xTurtles[i].type << "\nLocation: (" << xTurtles[i].pose.x << "," << xTurtles[i].pose.y << ")" << std::endl;
