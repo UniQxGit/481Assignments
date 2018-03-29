@@ -93,12 +93,16 @@ void move_goal (turtlesim::Pose goal_pose);
 
 void Turtle::print()
 {
-	std::cout << "\nName: " << name << "\nPARENT: " << (parent!=NULL?parent->name:"NONE") << "\nType: " << type << "\nLocation: (" << pose.x << "," << pose.y << ")" << std::endl;
+	std::cout << "Name: " << name << "\nPARENT: " << (parent!=NULL?parent->name:"NONE") << "\nType: " << type << "\nLocation: (" << pose.x << "," << pose.y << ")" << "\nF(n): " << f() << std::endl;
 	std::cout << "Children:" << std::endl;
 	for (int i = 0; i < children.size(); i++)
 	{
 		//children[i].print();
-		std::cout << "\tName: " << children[i]->name << "\n\tType: " << children[i]->type << "\n\tLocation: (" << children[i]->pose.x << "," << children[i]->pose.y << ")" << "\n\tF(n): " << f() << "\n\n" << std::endl;
+		std::cout << "\tName: " << children[i]->name << "\n\tType: " << children[i]->type << "\n\tLocation: (" << children[i]->pose.x << "," << children[i]->pose.y << ")" << "\n\tF(n): " << f() << "\n" << std::endl;
+	}
+	if(children.size() == 0)
+	{
+		std::cout << "\t" << name << " has no children \n" << std::endl;
 	}
 }
 
@@ -143,12 +147,13 @@ int Tree::getCount()
 
 void Tree::printat(Turtle t)
 {
+	t.print();
+	
 	if(t.children.size() <= 0 )
 	{
-		std::cout << t.name << " has no children " << std::endl;
 		return;
 	}
-	t.print();
+
 	for(int i = 0; i < t.children.size(); i++)
 	{
 		printat(*t.children[i]);
@@ -297,6 +302,7 @@ int main(int argc, char ** argv)
 	std::cout << "\nPRINTING X TURTLES: " << std::endl;
 	for (int i = 0; i < xTurtles.size(); i++)
 	{
+		//xTurtles[i].print();
 		std::cout << "\nName: " << xTurtles[i].name << "\nType: " << xTurtles[i].type << "\nLocation: (" << xTurtles[i].pose.x << "," << xTurtles[i].pose.y << ")" << std::endl;
 	}
 
