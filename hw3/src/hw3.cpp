@@ -4,6 +4,7 @@
 #include "boost/bind.hpp"
 
 #include <sstream>
+#include <vector>
 
 using namespace std;
 //A lot of this stuff is based from 'wiki.ros.org/turtlesim' youtube video tutorials
@@ -16,10 +17,60 @@ bool poseHasUpdated = false;		//Used to wait for initial pose data before moving
 const double PI = 3.14159265359;
 
 //hw3 stuff
+struct Turtle {
+	void print();
+	double h();
+	double g();
+	double f();
+	Turtle()
+	{
+		parent = NULL;
+		name = "";
+		type = "";
+		hValue = 0;
+		gValue = 0;
+		fValue = 0;
+		pose.x = -1;
+		pose.y = -1;
+	}
+
+	string name;
+	string type;
+	double hValue;
+	double gValue;
+	double fValue;
+	ros::Subscriber sub;
+	turtlesim::Pose pose;
+
+	Turtle *parent;
+	vector<Turtle> children;
+};
+
+class Tree {
+public:
+	Tree()
+	{
+		root = Turtle();
+		root.name = "ROOT";
+		count = 0;
+	}
+
+	void add(Turtle *parent,Turtle *node);
+	void printat(Turtle t);
+	int getCount();
+	Turtle root;
+
+private:
+	
+	int count;
+};
+
 bool T_turtlesHasUpdated = false;
-const int num_T_turts = 3;
-ros::Subscriber T_subber[num_T_turts];
-turtlesim::Pose T_turtles[num_T_turts] = {};
+int num_turtles_updated = 0;
+int num_turtles = 3;
+// ros::Subscriber T_subber[num_T_turts];
+// turtlesim::Pose T_turtles[num_T_turts] = {};
+vector<Turtle> xTurtles;
 
 //Functions
 double degrees2radians(double angle_in_degrees);
@@ -28,24 +79,86 @@ void poseCallback(const turtlesim::Pose::ConstPtr & pose_message);
 double getDistance(double x1, double y1, double x2, double y2);
 void move_goal (turtlesim::Pose goal_pose);
 
-void show_all_turts() 
+void Turtle::print()
 {
-	for (int i = 0; i < num_T_turts; i < i++) 
+	std::cout << "\nName: " << name << "\nType: " << type << "\nLocation: (" << pose.x << "," << pose.y << ")" << std::endl;
+	std::cout << "Children:" << std::endl;
+	for (int i = 0; i < children.size(); i++)
 	{
-		std::cout << "T_turtle " << i + 1 << ": (" << T_turtles[i].x << ", " << T_turtles[i].y << ")" << std::endl;
+		std::cout << "\tName: " << children[i].name << "\n\tType: " << children[i].type << "\n\tLocation: (" << children[i].pose.x << "," << children[i].pose.y << ")" << "\n\tF(n): " << f()  << "\n" << std::endl;
+	}
+}
+
+//Replace with heuristic code
+double Turtle::h()
+{
+	hValue = 0;
+	return hValue;
+}
+
+//Replace with cost code
+double Turtle::g()
+{
+	gValue = 0;
+	return gValue;
+}
+
+double Turtle::f()
+{
+	return hValue + gValue;
+}
+
+void Tree::add(Turtle *parent, Turtle *node)
+{
+	node->parent = new Turtle();
+	if(parent == NULL)
+	{
+		node->parent = &root;
+		root.children.push_back(*node);
+	}else{
+		parent->children.push_back(*node);
+		node->parent = parent;
+	}
+}
+
+int Tree::getCount()
+{
+	return count;
+}
+
+void Tree::printat(Turtle t)
+{
+	if(t.children.size() <= 0 )
+		return;
+	t.print();
+	for(int i = 0; i < t.children.size(); i++)
+	{
+		printat(t.children[i]);
 	}
 }
 
 
-void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, const std::string topic)
-{
-	int topic_num = std::atoi(topic.c_str());
+// void show_all_turts() 
+// {
+// 	for (int i = 0; i < num_T_turts; i < i++) 
+// 	{
+// 		std::cout << "T_turtle " << i + 1 << ": (" << T_turtles[i].x << ", " << T_turtles[i].y << ")" << std::endl;
+// 	}
+// }
 
+void GetTurtles()
+{
+
+}
+
+
+void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, Tree *tree, Turtle *t)
+{
 	// after the initial update we don't need to worry anymore
 	if (!T_turtlesHasUpdated) 
 	{
 
-		std::cout << "Updating Turtle " << topic_num - 1 << std::endl;
+		std::cout << "Updating " << t->type << " Turtle " << std::endl;
 		turtlesim::Pose temp;
 
 		temp.x = pose_message->x;
@@ -53,11 +166,18 @@ void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, const std::st
 		temp.theta = pose_message->theta;
 
 
-		T_turtles[topic_num - 1] = temp;
+		t->pose = temp;
+		std::cout << "(" << t->pose.x << "," << t->pose.y << ")" << std::endl;
+		num_turtles_updated++;
+		if(t->type == "T")
+			tree->add(NULL,t);
+		else if(t->type == "X")
+			xTurtles.push_back(*t);
+		//T_turtles[topic_num - 1] = temp;
 	}
 
 
-	if (topic_num >= num_T_turts || T_turtlesHasUpdated) 
+	if (num_turtles_updated >= num_turtles || T_turtlesHasUpdated) 
 	{
 		T_turtlesHasUpdated = true;
 	}
@@ -65,6 +185,7 @@ void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, const std::st
 
 int main(int argc, char ** argv)
 {
+	std::cout << "beginning hw3" << std::endl;
 	//Basic Ros necessities
 	ros::init(argc, argv, "hw3");
 	ros::NodeHandle n;
@@ -75,18 +196,65 @@ int main(int argc, char ** argv)
 	pose_subscriber = n.subscribe("/turtle1/pose", 10, poseCallback);
 
 	//subscribe to T's
-	for (int i = 1; i <= num_T_turts; i++) 
+	ros::master::V_TopicInfo alltopics;
+	ros::master::getTopics(alltopics);
+
+	num_turtles = alltopics.size()-1;
+
+	Tree tree;
+	Turtle *t;//, *tx;
+
+	for (int i = 1; i <= alltopics.size(); i++) 
 	{
+
 		stringstream topic_stream;
 		topic_stream << i;
 		string topic_num = topic_stream.str(); 
 
+		stringstream name_stream_T;
+		name_stream_T << "T" << i;
+
 		stringstream topic_stream2;
 		topic_stream2 << "/T" << i << "/pose";
-		string topic_string = topic_stream2.str();
+		string topic_string_T = topic_stream2.str();
 
-		T_subber[i] = n.subscribe<turtlesim::Pose>(topic_string, 10, boost::bind(get_all_turts, _1, topic_num));
+
+		stringstream topic_stream3;
+		stringstream name_stream_X;
+		name_stream_X << "X" << i;
+		topic_stream3 << "/X" << i << "/pose";
+		string topic_string_X = topic_stream3.str();
+
+
+		for(int j = 1; j <= alltopics.size(); j++)
+		{
+			//std::cout << "Checking : " << topic_string_X << " against " << alltopics[i].name << std::endl;
+			if (alltopics[j].name.compare(topic_string_T) == 0)
+			{
+				// std::cout << "Found: " << name_stream_T.str() << std::endl;
+				t = new Turtle();
+				t->name = name_stream_T.str();
+				t->type = "T";
+				t->sub = n.subscribe<turtlesim::Pose>(topic_string_T, 10, boost::bind(get_all_turts, _1, &tree, t));
+				//T_subber[i] = n.subscribe<turtlesim::Pose>(topic_string, 10, boost::bind(get_all_turts, _1, &t, topic_num));
+			}
+
+
+
+			if (alltopics[j].name.compare(topic_string_X) == 0)
+			{
+				// std::cout << "Found: " << name_stream_X.str() << std::endl;
+				t = new Turtle();
+				t->name = name_stream_X.str();
+				t->type = "X";
+				t->sub = n.subscribe<turtlesim::Pose>(topic_string_X, 10, boost::bind(get_all_turts, _1, &tree, t));
+				//T_subber[i] = n.subscribe<turtlesim::Pose>(topic_string, 10, boost::bind(get_all_turts, _1, &t, topic_num));
+			}	
+		}
+		
 	}
+
+
 
 	//wait for initial 'turtle position' data to come in (absolutely necessary!)
 	while(!poseHasUpdated || !T_turtlesHasUpdated)
@@ -95,7 +263,16 @@ int main(int argc, char ** argv)
 	}
 
 	//hw3 stuff
-	show_all_turts();
+	//show_all_turts();
+
+	std::cout << "PRINTING X TURTLES: " << std::endl;
+	for (int i = 0; i < xTurtles.size(); i++)
+	{
+		std::cout << "\nName: " << xTurtles[i].name << "\nType: " << xTurtles[i].type << "\nLocation: (" << xTurtles[i].pose.x << "," << xTurtles[i].pose.y << ")" << std::endl;
+	}
+
+	std::cout << "\nPRINTING TREE: " << std::endl;
+	tree.printat(tree.root);
 
 	//-----Drawing the crown-----
 	double height = 3.0;
