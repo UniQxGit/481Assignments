@@ -1,30 +1,15 @@
 # include <iostream>
+# include <string>
 # include <vector>
 using namespace std;
 
-vector<Turtle> remainingTturtle;
-vector<Turtle> Xturtle;
-vector<Point> nextSteps;
-bool searchSpaceMatrix[23][23];
-double heuristicMatrix[23][23];
-
 class Point {
 public:
-	Point() {}
-	Point(int x, int y) {
-		xval = x;
-		yval = y;
-	}
-	int x() {
-		return xval;
-	}
-	int y() {
-		return yval;
-	}
-	void setXY(double x, double y) {
-		xval = x;
-		yval = y;
-	}
+	Point();
+	Point(int x, int y);
+	int x();
+	int y();
+	void setXY(int x, int y);
 
 private:
 	int xval;
@@ -33,18 +18,11 @@ private:
 
 class Turtle {
 public:
-	bool isTturtle() {
-		if (type == 'T')
-			return true;
-		else
-			return false;
-	}
-	double x() {
-		return pos.x();
-	}
-	double y() {
-		return pos.y();
-	}
+	Turtle(string n, int x, int y);
+	bool isTturtle();
+	int x();
+	int y();
+	Point getPos();
 
 private:
 	Point pos;
@@ -52,8 +30,71 @@ private:
 	char type;
 };
 
+// global variables
+vector<Turtle> remainingTturtle = {Turtle("T1", 8, 8), Turtle("T2", 9, 9), Turtle("T3", 10, 7), Turtle("T4", 11, 8), Turtle("T5", 9, 10) }; // value given for test. should take input from John's code
+vector<Turtle> Xturtle = { Turtle("X1", 3, 6), Turtle("X2", 10, 10), Turtle("X3", 5, 7), Turtle("X4", 9, 7) }; // value given for test. should take input from John's code
+vector<Point> nextSteps;
+bool searchSpaceMatrix[23][23];
+double heuristicMatrix[23][23];
+Turtle* TturtleMatrix[23][23];
+
+vector<Point> path;
+vector<Turtle> TturtleEncoutered;
+
+// function definations
+Point::Point() {}
+Point::Point(int x, int y) {
+	xval = x;
+	yval = y;
+}
+int Point::x() {
+	return xval;
+}
+int Point::y() {
+	return yval;
+}
+void Point::setXY(int x, int y) {
+	xval = x;
+	yval = y;
+}
+
+
+Turtle::Turtle(string n, int x, int y) {
+	name = n;
+	pos.setXY(2 * x, 2 * y);
+}
+bool Turtle::isTturtle() {
+	if (type == 'T')
+		return true;
+	else
+		return false;
+}
+int Turtle::x() {
+	return pos.x();
+}
+int Turtle::y() {
+	return pos.y();
+}
+Point Turtle::getPos() {
+	return pos;
+}
+
+
 double distanceP2P(Point a, Point b) {
 	return (sqrt((a.x() - b.x()) * (a.x() - b.x()) + (a.y() - b.y()) * (a.y() - b.y())));
+}
+
+void setTturtles() {
+	for (int i = 0; i < 23; i++) {
+		for (int j = 0; j < 23; j++) {
+			TturtleMatrix[i][j] = NULL; // initiate all pointers to NULL
+		}
+	}
+	for (int k = 0; k < remainingTturtle.size(); k++) {
+		int i = remainingTturtle[k].x();
+		int j = remainingTturtle[k].y();
+		TturtleMatrix[i][j] = & remainingTturtle[k];
+	}
 }
 
 double sumDistanceToAllRemainTturtle (Point curr){
@@ -68,14 +109,8 @@ double sumXturtlePenulty(Point curr) {
 	double sum = 0.0;
 	for (int i = 0; i < remainingTturtle.size(); i++) {
 		for (int j = 0; j < Xturtle.size(); j++) {
-			if ((Xturtle[j].x() < curr.x() && Xturtle[j].x() > remainingTturtle[i].x()) || (Xturtle[j].x() > curr.x() && Xturtle[j].x() < remainingTturtle[i].x())) {
-				sum += 1;
-			}
-		}
-	}
-	for (int i = 0; i < remainingTturtle.size(); i++) {
-		for (int j = 0; j < Xturtle.size(); j++) {
-			if ((Xturtle[j].y() < curr.y() && Xturtle[j].y() > remainingTturtle[i].y()) || (Xturtle[j].y() > curr.y() && Xturtle[j].y() < remainingTturtle[i].y())) {
+			if (((Xturtle[j].x() < curr.x() && Xturtle[j].x() > remainingTturtle[i].x()) || (Xturtle[j].x() > curr.x() && Xturtle[j].x() < remainingTturtle[i].x())) &&
+				((Xturtle[j].y() < curr.y() && Xturtle[j].y() > remainingTturtle[i].y()) || (Xturtle[j].y() > curr.y() && Xturtle[j].y() < remainingTturtle[i].y()))) {
 				sum += 1;
 			}
 		}
@@ -84,10 +119,10 @@ double sumXturtlePenulty(Point curr) {
 }
 
 void setHeuristicMatrix(Point current) {
-	for (int i = current.x() - 1; i < current.x() + 1; i++) {
-		for (int j = current.y() - 1; j < current.y() + 1; j++) {
+	for (int i = current.x() - 1; i <= current.x() + 1; i++) {
+		for (int j = current.y() - 1; j <= current.y() + 1; j++) {
 			Point temp(i, j);
-			heuristicMatrix[i][j] = distanceP2P(current, temp) + sumDistanceToAllRemainTturtle(current) + sumXturtlePenulty(current);//- multiple Tturtle bounus 
+			heuristicMatrix[i][j] = distanceP2P(current, temp) + sumDistanceToAllRemainTturtle(temp) + sumXturtlePenulty(temp);//- multiple Tturtle bounus 
 		}
 	}
 }
@@ -99,8 +134,8 @@ void setSearchSpace() {
 		}
 	}
 	for (int i = 0; i < Xturtle.size(); i++) {
-		int x = 2 * Xturtle[i].x();
-		int y = 2 * Xturtle[i].y();
+		int x = Xturtle[i].x();
+		int y = Xturtle[i].y();
 		searchSpaceMatrix[x][y] = false;
 		searchSpaceMatrix[x - 1][y] = false;
 		searchSpaceMatrix[x + 1][y] = false;
@@ -146,37 +181,87 @@ void setNextSteps(Point current) {
 		nextSteps.push_back(downright);
 }
 
-void search(Point current) {
-	if (remainingTturtle.size() == 0)
+void printPath() {
+	for (int i = 0; i < path.size(); i++) {
+		cout << "(" << path[i].x() << ", " << path[i].y() << ") ";
+	}
+}
+
+bool searchAllTturtle(Point current) {
+	if (remainingTturtle.size() == 0) {
 		printPath();
+		return true;
+	}
 	else {
+		
 		setHeuristicMatrix(current);
 		setNextSteps(current);
 
-		int i;
+		int index;
 		double min_nextStep = heuristicMatrix[nextSteps[0].x()][nextSteps[0].y()];
-		for (i = 0; i < nextSteps.size(); i++) {
-			if (heuristicMatrix[nextSteps[i].x()][nextSteps[i].y()] < min_nextStep)
-				min_nextStep = heuristicMatrix[nextSteps[i].x()][nextSteps[i].y()];
+		for (index = 0; index < nextSteps.size(); index++) {
+			if (heuristicMatrix[nextSteps[index].x()][nextSteps[index].y()] < min_nextStep)
+				min_nextStep = heuristicMatrix[nextSteps[index].x()][nextSteps[index].y()];
 		}
-		// if Tturtle encountered, put in a list
-		current.setXY(nextSteps[i].x(), nextSteps[i].y());
-		search(current);
+		
+		current.setXY(nextSteps[index].x(), nextSteps[index].y());
+		path.push_back(nextSteps[index]);
+
+		// if incounters Tturtle, put in a path list, and remove from remainingTturtle
+		for (int i = 0; i < remainingTturtle.size(); i++) {
+			if (distanceP2P(current, remainingTturtle[i].getPos()) <= 0.5) {
+				TturtleEncoutered.push_back(remainingTturtle[i]);
+				remainingTturtle.erase(remainingTturtle.begin() + i);  // update remaining T turtle vector
+				setTturtles();  // update remaining T turtles matrix
+			}
+		}
+
+		searchAllTturtle(current);
 	}
 }
 
 int main() {
-	setTturtles;
-	setSearchSpace();
+	setTturtles(); // this function takes input from hw3.cpp -> works!
+
+	// for test only
+	for (int i = 0; i < 23; i++) {
+		for (int j = 0; j < 23; j++) {
+			if (TturtleMatrix[i][j] != NULL)
+				cout << "T";
+			else
+				cout << "0";
+			cout << " ";
+		}
+		cout << endl;
+	}
+
+	setSearchSpace();   // -> works!
+	// for test only
+	for (int i = 0; i < 23; i++) {
+		for (int j = 0; j < 23; j++) {
+			cout << searchSpaceMatrix[i][j] << " ";
+		}
+		cout << endl;
+	}
+
+	int INIX = 6, INIY = 6; // double INIX=5.544445, INIY=5.544445, will take input from hw3test.cpp 
 	Point spawnPoint (INIX * 2, INIY * 2);
 
+	// for test only
+	cout << spawnPoint.x() << endl;
+	cout << spawnPoint.y() << endl;
 
 	setHeuristicMatrix(spawnPoint);
-	search(spawnPoint);
+	// for test only
+	for (int i = 0; i < 23; i++) {
+		for (int j = 0; j < 23; j++) {
+			cout << heuristicMatrix[i][j] << " ";
+		}
+		cout << endl;
+	}
 
+	//searchAllTturtle(spawnPoint);
+
+	system("pause");
+	return 0;
 }
-
-
-
-
-
