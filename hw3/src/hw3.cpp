@@ -5,16 +5,42 @@
 
 #include <sstream>
 #include <vector>
+#include <cmath>
 
 using namespace std;
 //A lot of this stuff is based from 'wiki.ros.org/turtlesim' youtube video tutorials
 
-//Global Variables
-ros::Publisher velocity_publisher; 	//topic to tell turtle where to go is /turtle1/cmd_vel
-ros::Subscriber pose_subscriber;   	//topic to get current turtle position is /turtle1/pose
-turtlesim::Pose turtlesim_pose;    	//Current position of the turtle
-bool poseHasUpdated = false;		//Used to wait for initial pose data before moving
-const double PI = 3.14159265359;
+
+
+class Vector2 {
+public:
+	Vector2(){}
+	Vector2(double x, double y){
+		xVal = x;
+		yVal = y;
+	}
+	void set(double x, double y);
+	Vector2 normalize();
+	double x(){
+		return xVal;
+	};
+	
+	double y(){
+		return yVal;
+	};
+
+	Vector2 operator-(const Vector2 &rhs) const{
+		Vector2 result;
+		result.set(xVal-rhs.xVal,yVal-rhs.yVal);
+		return result;
+	}
+	double operator*(const Vector2 &rhs) const{
+		return xVal*rhs.xVal+yVal*rhs.yVal;
+	}
+private:
+	double xVal;
+	double yVal;
+};
 
 //hw3 stuff
 struct Turtle {
@@ -22,11 +48,12 @@ struct Turtle {
 	double h();
 	double g();
 	double f();
+	
 	Turtle()
 	{
 		parent = NULL;
-		name = "";
-		type = "";
+		name = "EMPTY";
+		type = "NONE";
 		hValue = 0;
 		gValue = 0;
 		fValue = 0;
@@ -34,11 +61,12 @@ struct Turtle {
 		pose.y = -1;
 	}
 
-	Turtle(string n)
+	Turtle(Vector2 pos,Turtle &parent)
 	{
-		parent = NULL;
-		name = n;
-		type = "";
+		position = pos;
+		parent = parent;
+		name = "EMPTY";
+		type = "NONE";
 		hValue = 0;
 		gValue = 0;
 		fValue = 0;
@@ -53,9 +81,12 @@ struct Turtle {
 	double fValue;
 	ros::Subscriber sub;
 	turtlesim::Pose pose;
+	Vector2 position;
+
 
 	Turtle *parent;
 	vector<Turtle *> children;
+	vector<Turtle> xInTheWay;
 };
 
 class Tree {
@@ -69,20 +100,27 @@ public:
 
 	void add(Turtle *parent,Turtle *node);
 	void printat(Turtle t);
-	//Turtle[] getPath(Turtle t); //Replace with search function
+	void setPath();
+	vector<Turtle *> getPath();
+	void SetAvoidPath();
 	int getCount();
 	Turtle root;
-
 private:
 	int count;
+	vector<Turtle *> path;
 };
 
+//Global Variables
+ros::Publisher velocity_publisher; 	//topic to tell turtle where to go is /turtle1/cmd_vel
+ros::Subscriber pose_subscriber;   	//topic to get current turtle position is /turtle1/pose
+bool poseHasUpdated = false;		//Used to wait for initial pose data before moving
+const double PI = 3.14159265359;
 bool T_turtlesHasUpdated = false;
 int num_turtles_updated = 0;
-int num_turtles = 3;
-// ros::Subscriber T_subber[num_T_turts];
-// turtlesim::Pose T_turtles[num_T_turts] = {};
-vector<Turtle> xTurtles;
+int num_turtles = 0;
+vector<Turtle> xTurtles;			
+Turtle navTurtle; 					//Main turtle to track.
+
 
 //Functions
 double degrees2radians(double angle_in_degrees);
@@ -91,15 +129,34 @@ void poseCallback(const turtlesim::Pose::ConstPtr & pose_message);
 double getDistance(double x1, double y1, double x2, double y2);
 void move_goal (turtlesim::Pose goal_pose);
 
+void Vector2::set(double x, double y)
+{
+	xVal = x;
+	yVal = y;
+}
+
+Vector2 Vector2::normalize()
+{
+	Vector2 normalized;
+	double magnitude = sqrt(xVal * xVal + yVal * yVal);
+	normalized.set(xVal/magnitude,yVal/magnitude);
+	return normalized;
+}
+
 void Turtle::print()
 {
-	std::cout << "Name: " << name << "\nPARENT: " << (parent!=NULL?parent->name:"NONE") << "\nType: " << type << "\nLocation: (" << pose.x << "," << pose.y << ")" << "\nF(n): " << f() << std::endl;
+	std::cout << "Name: " << name << "\nPARENT: " << (parent!=NULL?parent->name:"NONE") << "\nType: " << type << "\nLocation: (" << position.x() << "," << position.y() << ")" << "\nF(n): " << f() << std::endl;
 	std::cout << "Children:" << std::endl;
+	for (int i = 0; i < xInTheWay.size(); i++)
+	{
+		std::cout << "Turtles In the way: " << xInTheWay[i].name << "(" << xInTheWay[i].position.x() << "," << xInTheWay[i].position.y() << ")" << endl;
+	}
+
 	for (int i = 0; i < children.size(); i++)
 	{
-		//children[i].print();
-		std::cout << "\tName: " << children[i]->name << "\n\tType: " << children[i]->type << "\n\tLocation: (" << children[i]->pose.x << "," << children[i]->pose.y << ")" << "\n\tF(n): " << f() << "\n" << std::endl;
+		std::cout << "\tName: " << children[i]->name << "\n\tType: " << children[i]->type << "\n\tLocation: (" << children[i]->position.x() << "," << children[i]->position.y() << ")" << "\n\tF(n): " << children[i]->f() << "\n" << std::endl;
 	}
+
 	if(children.size() == 0)
 	{
 		std::cout << "\t" << name << " has no children \n" << std::endl;
@@ -109,25 +166,60 @@ void Turtle::print()
 //Replace with heuristic code
 double Turtle::h()
 {
-	hValue = 0;
+	if(parent == NULL)
+		return 0;
+
+	double sum = 0.0;
+	double dot = 0.0;
+	xInTheWay.clear();
+	Turtle current = *parent;
+	for (int i = 0; i < xTurtles.size(); i++) {
+		//cout << name << ". Checking " << xTurtles[i].name << endl;
+		if (((xTurtles[i].position.x() <= current.position.x()+0.5 && xTurtles[i].position.x() >= position.x()-0.5) || (xTurtles[i].position.x() >= current.position.x()-0.5 && xTurtles[i].position.x() <= position.x()+0.5)) &&
+			((xTurtles[i].position.y() <= current.position.y()+0.5 && xTurtles[i].position.y() >= position.y()-0.5) || (xTurtles[i].position.y() >= current.position.y()-0.5 && xTurtles[i].position.y() <= position.y()+0.5))) {
+			dot = (xTurtles[i].position-current.position).normalize() * (position-current.position).normalize();
+			
+			
+
+			if(dot > 0.8)
+			{
+				sum += dot;
+				cout << xTurtles[i].name << " in the way: " << xTurtles[i].name <<"(" << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") "<< current.name << "(" << current.position.x() << "," << current.position.y() << ") " << name << "(" << position.x() << "," << position.y() << ")" << dot << endl;
+				xInTheWay.push_back(xTurtles[i]);
+			}
+			else
+			{
+				cout << xTurtles[i].name << "Not in the way: " << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") N(" << current.position.x() << "," << current.position.y() << ") T(" << position.x() << "," << position.y() << ")" << dot << endl;
+			}
+			//cout << "\t" << xTurtles[i].name << "\n\tLHS: " << (xTurtles[i].position-current.position).normalize().x() << "," << (xTurtles[i].position-current.position).normalize().y() 
+			//	<< "\n\tRHS: " << (position-current.position).normalize().x() << "," << (position-current.position).normalize().y();
+			//cout << "\n\tSum: " << sum << endl;
+		}
+	}
+	//cout << "SUM: " << sum << endl;
+	hValue = getDistance(current.position.x(),current.position.y(),position.x(),position.y())*sum;
 	return hValue;
 }
 
 //Replace with cost code
 double Turtle::g()
 {
-	gValue = 0;
+	if(parent != NULL)
+		gValue = parent->gValue;
+	gValue += getDistance(parent->position.x(),parent->position.y(),position.x(),position.y());
 	return gValue;
 }
 
 double Turtle::f()
 {
-	return hValue + gValue;
+	fValue = g() + h();
+	//cout << gValue << " | " << hValue;
+	return fValue;
 }
 
 void Tree::add(Turtle *parent, Turtle *node)
 {
-	node->parent = new Turtle("EMPTY");
+	node->parent = new Turtle();
 	if(parent == NULL)
 	{
 		node->parent = &root;
@@ -136,8 +228,6 @@ void Tree::add(Turtle *parent, Turtle *node)
 		parent->children.push_back(node);
 		node->parent = parent;
 	}
-	// std::cout << "\nAdding ";
-	// node->print();
 }
 
 int Tree::getCount()
@@ -160,48 +250,82 @@ void Tree::printat(Turtle t)
 	}
 }
 
-
-// void show_all_turts() 
-// {
-// 	for (int i = 0; i < num_T_turts; i < i++) 
-// 	{
-// 		std::cout << "T_turtle " << i + 1 << ": (" << T_turtles[i].x << ", " << T_turtles[i].y << ")" << std::endl;
-// 	}
-// }
-
-void GetTurtles()
+void Tree::setPath()
 {
+	if(root.children.size() == 0)
+		return;
+	Turtle *current = &root;
+	double minF = current->children[0]->f();
+	double currentF = 0;
+	int minIndex = 0;
 
+
+	for (int i = 0; i < root.children.size(); i++)
+	{
+		if(current->children.size()>0)
+		{
+			minF = current->children[0]->f();
+		}
+		minIndex = -1;
+		for (int j = 0; j < current->children.size(); j++)
+		{
+			currentF = current->children[j]->f();
+			cout << current->children[j]->name << " f()=" << currentF << endl;
+			if (currentF <= minF)
+			{
+				minF = currentF;
+				minIndex = j;
+			}
+		}
+
+		for (int j = 0; j < current->children.size(); j++)
+		{
+			if (j != minIndex)
+			{
+				current->children[minIndex]->children.push_back(current->children[j]);
+				current->children[j]->parent = current->children[minIndex];
+			}
+		}
+
+		if(minIndex >= 0)
+		{
+			path.push_back(current->children[minIndex]);
+			current = current->children[minIndex];
+			cout << "Path " << i << ": " << current->name << " F=" << current->f() << " (" << current->position.x() << "," << current->position.y() << ")" 
+			<< "From:" << current->parent->name << endl;
+		}	
+	}
+	cout << "Done" << endl;
 }
 
+vector<Turtle *> Tree::getPath()
+{
+	return path;
+}
 
 void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, Tree *tree, Turtle *t)
 {
 	// after the initial update we don't need to worry anymore
 	if (!T_turtlesHasUpdated && t->pose.x == -1 && t->pose.y == -1) 
 	{
-
-		//std::cout << "Updating " << t->type << " Turtle " << std::endl;
 		turtlesim::Pose temp;
 
 		temp.x = pose_message->x;
 		temp.y = pose_message->y;
 		temp.theta = pose_message->theta;
 
-
+		t->position.set(pose_message->x,pose_message->y);
 		t->pose = temp;
 		
 		if(t->type == "T")
 		{
 			tree->add(NULL,t);
-
-			//Testing adding to tree
-			tree->add(t,new Turtle("TestChild1"));
-			tree->add(t,new Turtle("TestChild2"));
 		}
 		else if(t->type == "X")
+		{
+			cout << "Added " << t->name << endl;
 			xTurtles.push_back(*t);
-		//T_turtles[topic_num - 1] = temp;
+		}
 	}
 
 
@@ -260,16 +384,17 @@ int main(int argc, char ** argv)
 		
 		for(int j = 1; j <= alltopics.size(); j++)
 		{
-			//std::cout << "Checking : " << topic_string_X << " against " << alltopics[i].name << std::endl;
-			if (alltopics[j].name.compare(topic_string_T) == 0 && !foundT)
+			if(i==2)
+			{
+				cout << topic_string_T << " VS " << alltopics[j].name << endl;
+			}
+			if (alltopics[j].name.compare(topic_string_T) == 0)
 			{
 				foundT = true;
-				// std::cout << "Found: " << name_stream_T.str() << std::endl;
 				t = new Turtle();
 				t->name = name_stream_T.str();
 				t->type = "T";
 				t->sub = n.subscribe<turtlesim::Pose>(topic_string_T, 10, boost::bind(get_all_turts, _1, &tree, t));
-				//T_subber[i] = n.subscribe<turtlesim::Pose>(topic_string, 10, boost::bind(get_all_turts, _1, &t, topic_num));
 			}
 
 
@@ -277,12 +402,10 @@ int main(int argc, char ** argv)
 			if (alltopics[j].name.compare(topic_string_X) == 0 && !foundX)
 			{
 				foundX = true;
-				// std::cout << "Found: " << name_stream_X.str() << std::endl;
 				t = new Turtle();
 				t->name = name_stream_X.str();
 				t->type = "X";
 				t->sub = n.subscribe<turtlesim::Pose>(topic_string_X, 10, boost::bind(get_all_turts, _1, &tree, t));
-				//T_subber[i] = n.subscribe<turtlesim::Pose>(topic_string, 10, boost::bind(get_all_turts, _1, &t, topic_num));
 			}	
 		}
 		
@@ -298,6 +421,8 @@ int main(int argc, char ** argv)
 
 	//hw3 stuff
 	//show_all_turts();
+	tree.root.position.set(navTurtle.position.x(),navTurtle.position.y());
+
 
 	std::cout << "\nPRINTING X TURTLES: " << std::endl;
 	for (int i = 0; i < xTurtles.size(); i++)
@@ -307,18 +432,113 @@ int main(int argc, char ** argv)
 	}
 
 	std::cout << "\nPRINTING TREE: " << std::endl;
-	tree.printat(tree.root);
+	
+	cout << tree.root.children.size() << endl;
+	//tree.printat(tree.root);
+	tree.setPath();
 
-	//-----Drawing the crown-----
+	//tree.printat(tree.root);
+
+	//-----Move the turtle-----
 	double height = 3.0;
 	double width = 3.0;
-	turtlesim::Pose start_pose = turtlesim_pose;
+	turtlesim::Pose start_pose = navTurtle.pose;
 	turtlesim::Pose goal_pose;
 
-	//move up
-	//goal_pose.x = start_pose.x;
-	//goal_pose.y = start_pose.y + height;
-	//move_goal(goal_pose);
+	for(int i = 0; i < tree.getPath().size(); i++)
+	{
+		cout << "Moving Around " << tree.getPath()[i]->name << endl;
+		if(tree.getPath()[i]->xInTheWay.size()>0)
+		{
+			Tree avoid;
+
+			cout << "0" << endl;
+			Turtle dest = *tree.getPath()[i];
+			cout << "1" << endl;
+			//avoid.add(NULL,&dest);
+			cout << "2" << endl;
+			Turtle start = *tree.getPath()[(i>0?i-1:0)];
+			cout << "3" << endl;
+			start.parent = &dest;
+			avoid.root.position.set(start.position.x(),start.position.y());
+			cout << "4" << endl;
+
+			for(int j = 0; j < tree.getPath()[i]->xInTheWay.size(); j++)
+			{
+				Turtle *t;
+
+				t = new Turtle();
+				cout << "5" << endl;
+				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x()+1,tree.getPath()[i]->xInTheWay[j].position.y());
+				t->type = "X";
+				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0)
+				{
+					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
+					avoid.add(NULL,t);
+				}
+				cout << "5" << endl;
+				//parent->children.push_back(t);
+
+				t = new Turtle();
+				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x()-1,tree.getPath()[i]->xInTheWay[j].position.y());
+				t->type = "X";
+				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0)
+				{
+					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
+					avoid.add(NULL,t);
+				}
+				cout << "6" << endl;
+				//parent->children.push_back(t);
+
+				t = new Turtle();
+				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x(),tree.getPath()[i]->xInTheWay[j].position.y()+1);
+				t->type = "X";
+				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0)
+				{
+					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
+					avoid.add(NULL,t);
+				}
+				//parent->children.push_back(t);
+
+				t = new Turtle();
+				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x(),tree.getPath()[i]->xInTheWay[j].position.y()-1);
+				t->type = "X";
+				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0)
+				{
+					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
+					avoid.add(NULL,t);
+				}
+				//parent->children.push_back(t);
+			}
+
+			cout << "Intermidate Path count: " << avoid.root.children.size() << endl;
+			avoid.setPath();
+
+			for(int j = 0; j < avoid.getPath().size(); j++)
+			{
+				dest.parent = &navTurtle;//avoid.getPath()[j>0?j-1:0];
+				cout << "Moving to inter " << j << endl;
+				if(dest.h() == 0)
+				{
+					cout << "Path Clear! Moving to destination" << endl;
+					break;
+				}
+
+				//If Moving towards the goal
+				if((avoid.getPath()[j]->position - dest.parent->position) * (dest.position - dest.parent->position) > 0)
+				{
+					goal_pose.x = avoid.getPath()[j]->position.x();
+					goal_pose.y = avoid.getPath()[j]->position.y();
+					move_goal(goal_pose);
+				}
+				
+			}
+
+		}
+		goal_pose.x = tree.getPath()[i]->position.x();
+		goal_pose.y = tree.getPath()[i]->position.y();
+		move_goal(goal_pose);
+	}
 
 	//extra necessary stuff
 	loop_rate.sleep();
@@ -333,35 +553,20 @@ void move_goal (turtlesim::Pose goal_pose)
 	ros::Rate loop_rate(10);
 
 	//rotate the turtle first
-	double current_angle = 0.0;
-	double starting_angle = turtlesim_pose.theta;
-	double t0 = ros::Time::now().toSec();
-	float targetRotation = atan2(goal_pose.y-turtlesim_pose.y, goal_pose.x - turtlesim_pose.x) - turtlesim_pose.theta;
-	double angular_speed = degrees2radians(50);
-
-	bool clockwise = (targetRotation<0);
-	vel_msg.angular.x = 0;
-	vel_msg.angular.y = 0;
-
-	if (clockwise)
-		vel_msg.angular.z = -abs(angular_speed);
-	else
-		vel_msg.angular.z = abs(angular_speed);
-
-	do{
-		double t1 = ros::Time::now().toSec();
-		current_angle = angular_speed * (t1-t0);
-		std::cout << "Target Rotation: " << (targetRotation*180/PI) 
-		<< " Speed: " << (angular_speed*180/PI) 
-		<< " CAngle: " << (current_angle*180/PI) 
-		<< " DTime:"  << (t1-t0)
-		<< std::endl;
-
+	do 
+	{
+		//The closer we are pointed in the direction of the 'goal_pose', angular velocity goes closer to 0
+		vel_msg.angular.x = 0;
+		vel_msg.angular.y = 0;
+		vel_msg.angular.z = 1.0 * (atan2(goal_pose.y-navTurtle.pose.y, goal_pose.x - navTurtle.pose.x) - navTurtle.pose.theta);
 
 		velocity_publisher.publish(vel_msg);
 		ros::spinOnce();
 		loop_rate.sleep();
-	}while(current_angle<(abs(targetRotation))-degrees2radians(6));
+
+		
+		//chosen tolerance for angular velocity is 0.001
+	} while (vel_msg.angular.z >= 0.001 || vel_msg.angular.z <= -0.001);
 
 	vel_msg.angular.z = 0;
 	velocity_publisher.publish(vel_msg);
@@ -370,7 +575,7 @@ void move_goal (turtlesim::Pose goal_pose)
 	do 
 	{
 		//Once we reach the desired 'goal_pose', linear velocity goes to 0
-		vel_msg.linear.x = 1.0 * getDistance (turtlesim_pose.x, turtlesim_pose.y, goal_pose.x, goal_pose.y);
+		vel_msg.linear.x = 1.0 * getDistance (navTurtle.pose.x, navTurtle.pose.y, goal_pose.x, goal_pose.y);
 		vel_msg.linear.y = 0;
 		vel_msg.linear.z = 0;
 
@@ -379,7 +584,7 @@ void move_goal (turtlesim::Pose goal_pose)
 		loop_rate.sleep();
 
 		//chosen tolerance for linear velocity is 0.05
-	} while (getDistance(turtlesim_pose.x, turtlesim_pose.y, goal_pose.x, goal_pose.y) > .16);
+	} while (getDistance(navTurtle.pose.x, navTurtle.pose.y, goal_pose.x, goal_pose.y) > .16);
 	
 	//make the turtle stop
 	vel_msg.linear.x = 0;
@@ -427,9 +632,11 @@ void rotate (double angular_speed, double relative_angle, bool clockwise){
 void poseCallback(const turtlesim::Pose::ConstPtr & pose_message)
 {
 	poseHasUpdated = true;
-	turtlesim_pose.x = pose_message->x;
-	turtlesim_pose.y = pose_message->y;
-	turtlesim_pose.theta = pose_message->theta;
+	navTurtle.pose.x = pose_message->x;
+	navTurtle.pose.y = pose_message->y;
+	navTurtle.pose.theta = pose_message->theta;
+
+	navTurtle.position.set(pose_message->x,pose_message->y);
 }
 
 //-------helper functions-------
