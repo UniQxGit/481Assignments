@@ -210,3 +210,8 @@ target_link_libraries(hw3 ${catkin_LIBRARIES})
 #controlled_test.cpp
 add_executable(controlled_test src/controlled_test.cpp)
 target_link_libraries(controlled_test ${catkin_LIBRARIES})
+
+#search.cpp
+add_executable(search src/search.cpp)
+target_link_libraries(search ${catkin_LIBRARIES})
+

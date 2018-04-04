@@ -1,7 +1,14 @@
 # include <iostream>
+# include <sstream>
 # include <string>
 # include <vector>
 # include <cmath>
+# include "ros/ros.h"
+# include "geometry_msgs/Twist.h"
+# include "turtlesim/Pose.h"
+# include "boost/bind.hpp"
+
+
 using namespace std;
 
 class Point {
@@ -32,18 +39,19 @@ private:
 };
 
 // global variables
-vector<Turtle> remainingTturtle;// = {Turtle("T1", 8, 8), Turtle("T2", 9, 9), Turtle("T3", 10, 7), Turtle("T4", 11, 8), Turtle("T5", 9, 10) }; // value given for test. should take input from John's code
-vector<Turtle> Xturtle;// = { Turtle("X1", 3, 6), Turtle("X2", 10, 10), Turtle("X3", 5, 7), Turtle("X4", 9, 7) }; // value given for test. should take input from John's code
-vector<Point> nextSteps;
-bool searchSpaceMatrix[23][23];
-double heuristicMatrix[23][23];
-Turtle* TturtleMatrix[23][23];
-
-vector<Point> path;
+vector<Turtle> remainingTturtle; // value given for test. should take input from John's code
 vector<Turtle> TturtleEncoutered;
+vector<Turtle> Xturtle; // value given for test. should take input from John's code
+vector<Point> nextSteps;
+vector<Point> path;
+bool searchSpaceMatrix[23][23]; // the search space is a 11x11 grid with 0.5 intervals 
+double heuristicMatrix[23][23]; // each unit in the grid has a heuristic value 
+Turtle* TturtleMatrix[23][23];  // this matrix used to flag T turtle positions
+
 
 //Debugging:
 Point lastStep(-1,-1);
+
 // function definations
 Point::Point() {}
 Point::Point(int x, int y) {
@@ -100,6 +108,7 @@ void setTturtles() {
 	}
 }
 
+// heuristic function part 2: sum of distance to all remaining T turtles
 double sumDistanceToAllRemainTturtle (Point curr){
 	double sum = 0.0;
 	for (int i = 0; i < remainingTturtle.size(); i++) {
@@ -108,6 +117,7 @@ double sumDistanceToAllRemainTturtle (Point curr){
 	return sum;
 }
 
+// heuristic function part 3: sum of "X turtle in between" penalty
 double sumXturtlePenulty(Point curr) {
 	double sum = 0.0;
 	for (int i = 0; i < remainingTturtle.size(); i++) {
@@ -125,7 +135,7 @@ void setHeuristicMatrix(Point current) {
 	for (int i = current.x() - 1; i <= current.x() + 1; i++) {
 		for (int j = current.y() - 1; j <= current.y() + 1; j++) {
 			Point temp(i, j);
-			heuristicMatrix[i][j] = distanceP2P(current, temp) + sumDistanceToAllRemainTturtle(temp) + sumXturtlePenulty(temp);//- multiple Tturtle bounus 
+			heuristicMatrix[i][j] = distanceP2P(current, temp) + sumDistanceToAllRemainTturtle(temp) + sumXturtlePenulty(temp);//- multiple Tturtle bounus? 
 		}
 	}
 }
@@ -156,6 +166,8 @@ void setSearchSpace() {
 }
 
 bool isInSearchSpace(Point pnt) {
+	if (pnt.x() > 22 || pnt.y() > 22)
+		return false;
 	if (searchSpaceMatrix[pnt.x()][pnt.y()] == true)
 		return true;
 	if (searchSpaceMatrix[pnt.x()][pnt.y()] == false)
@@ -199,6 +211,7 @@ void printPath() {
 	cout << endl;
 }
 
+// best first search
 bool searchAllTturtle(Point current) {
 	if (remainingTturtle.size() == 0) {
 		printPath();
@@ -213,6 +226,7 @@ bool searchAllTturtle(Point current) {
 		double min_nextStep = heuristicMatrix[nextSteps[0].x()][nextSteps[0].y()];
 		cout << "Current: (" << current.x() << "," << current.y() << ")" << endl;
 		cout << "Getting Next Steps" << endl;
+		// pick the best among all possible nest steps
 		for (int i = 0; i < nextSteps.size(); i++) {
 			cout << "min_nextStep: " << floor(min_nextStep) << endl;
 			cout << "Next Step " << i << ": (" << nextSteps[i].x() << "," << nextSteps[i].y() << "): " << floor(heuristicMatrix[nextSteps[i].x()][nextSteps[i].y()]) << endl; 
@@ -229,12 +243,13 @@ bool searchAllTturtle(Point current) {
 		if(nextSteps[index].x() == lastStep.x() && nextSteps[index].y() == lastStep.y())
 		{
 			cout << "Looping! This space has already been visited" << endl;
-			return true;
+			return false;
 		}
 
 		if(nextSteps.size() == 0)
 		{
 			cout << "Stuck! Nowhere to go!" << endl;
+			return false;
 		}
 		lastStep = current;
 		current.setXY(nextSteps[index].x(), nextSteps[index].y());
@@ -243,7 +258,7 @@ bool searchAllTturtle(Point current) {
 		if(nextSteps[index].x() == -1 || nextSteps[index].x() > 22 || nextSteps[index].y() == -1 || nextSteps[index].y() > 22)
 		{
 			cout << "Out of bounds!" << endl;
-			return true;
+			return false;
 		}
 
 		// if incounters Tturtle, put in a path list, and remove from remainingTturtle
@@ -263,16 +278,25 @@ bool searchAllTturtle(Point current) {
 
 int main() {
 	//c++98 compliance
-	remainingTturtle.push_back(Turtle("T1", 8, 8));
-	remainingTturtle.push_back(Turtle("T2", 9, 9));
-	remainingTturtle.push_back(Turtle("T3", 10, 7));
-	remainingTturtle.push_back(Turtle("T4", 11, 8));
-	remainingTturtle.push_back(Turtle("T5", 9, 10));
+	remainingTturtle.clear();
+	remainingTturtle.push_back(Turtle("T1", 5, 9));
+	remainingTturtle.push_back(Turtle("T2", 8, 4));
+	remainingTturtle.push_back(Turtle("T3", 4, 2));
+	remainingTturtle.push_back(Turtle("T4", 6, 7));
+	remainingTturtle.push_back(Turtle("T5", 3, 8));
+	remainingTturtle.push_back(Turtle("T6", 5, 7));
+	remainingTturtle.push_back(Turtle("T7", 2, 10));
 
-	Xturtle.push_back(Turtle("X1", 3, 6));
-	Xturtle.push_back(Turtle("X2", 10, 10));
-	Xturtle.push_back(Turtle("X3", 5, 7));
-	Xturtle.push_back(Turtle("X4", 9, 7));
+	Xturtle.push_back(Turtle("X1", 7, 6));
+	Xturtle.push_back(Turtle("X2", 7, 3));
+	Xturtle.push_back(Turtle("X3", 10, 10));
+	Xturtle.push_back(Turtle("X4", 8, 10));
+	Xturtle.push_back(Turtle("X5", 8, 6));
+	Xturtle.push_back(Turtle("X6", 11, 7));
+	Xturtle.push_back(Turtle("X7", 2, 6));
+	Xturtle.push_back(Turtle("X8", 3, 6));
+	Xturtle.push_back(Turtle("X9", 11, 8));
+	Xturtle.push_back(Turtle("X10", 3, 10));
 
 	setTturtles(); // this function takes input from hw3.cpp -> works!
 
@@ -322,11 +346,14 @@ int main() {
 		heuristicMatrix[path[i].x()][path[i].y()] = -(i+2);
 	}
 
-	remainingTturtle.push_back(Turtle("T1", 8, 8));
-	remainingTturtle.push_back(Turtle("T2", 9, 9));
-	remainingTturtle.push_back(Turtle("T3", 10, 7));
-	remainingTturtle.push_back(Turtle("T4", 11, 8));
-	remainingTturtle.push_back(Turtle("T5", 9, 10));
+	remainingTturtle.push_back(Turtle("T1", 5, 9));
+	remainingTturtle.push_back(Turtle("T2", 8, 4));
+	remainingTturtle.push_back(Turtle("T3", 4, 2));
+	remainingTturtle.push_back(Turtle("T4", 6, 7));
+	remainingTturtle.push_back(Turtle("T5", 3, 8));
+	remainingTturtle.push_back(Turtle("T6", 5, 7));
+	remainingTturtle.push_back(Turtle("T7", 2, 10));
+
 	setTturtles();
 
 	cout << "TURTLE GRID" << endl;
@@ -345,7 +372,7 @@ int main() {
 
 			if(spawnPoint.x() == i && spawnPoint.y() == j)
 				cout << "S" << "  ";
-			if(TturtleMatrix[i][j] != NULL)
+			else if(TturtleMatrix[i][j] != NULL)
 				cout << "T" << "  ";
 			else if(!searchSpaceMatrix[i][j])
 			{
