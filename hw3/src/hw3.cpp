@@ -178,10 +178,8 @@ double Turtle::h()
 		if (((xTurtles[i].position.x() <= current.position.x()+0.5 && xTurtles[i].position.x() >= position.x()-0.5) || (xTurtles[i].position.x() >= current.position.x()-0.5 && xTurtles[i].position.x() <= position.x()+0.5)) &&
 			((xTurtles[i].position.y() <= current.position.y()+0.5 && xTurtles[i].position.y() >= position.y()-0.5) || (xTurtles[i].position.y() >= current.position.y()-0.5 && xTurtles[i].position.y() <= position.y()+0.5))) {
 			dot = (xTurtles[i].position-current.position).normalize() * (position-current.position).normalize();
-			
-			
 
-			if(dot > 0.8)
+			if(dot > 0.9)
 			{
 				sum += dot;
 				cout << xTurtles[i].name << " in the way: " << xTurtles[i].name <<"(" << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") "<< current.name << "(" << current.position.x() << "," << current.position.y() << ") " << name << "(" << position.x() << "," << position.y() << ")" << dot << endl;
@@ -525,7 +523,8 @@ int main(int argc, char ** argv)
 				}
 
 				//If Moving towards the goal
-				if((avoid.getPath()[j]->position - dest.parent->position) * (dest.position - dest.parent->position) > 0)
+				if((avoid.getPath()[j]->position - dest.parent->position) * (dest.position - dest.parent->position) > 0
+					&& avoid.getPath()[j]->hValue == 0)
 				{
 					goal_pose.x = avoid.getPath()[j]->position.x();
 					goal_pose.y = avoid.getPath()[j]->position.y();

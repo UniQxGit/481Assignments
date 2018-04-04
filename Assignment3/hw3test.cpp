@@ -170,9 +170,18 @@ void createTurtles(char tType, int cnt) {
         success = HW::sClient.call(req, resp);
         if(success) {
            if (tType == 'X')
+           {
               ROS_INFO("%s landed with face down.", req.name.c_str()); //X turtle
+              ROS_INFO("%f", req.x); //X turtle
+              std::cout << req.x << std::endl;
+           }
+          
            else 
+           {
               ROS_INFO("%s landed with face up.", req.name.c_str()); //T turtle
+              std::cout << req.x << std::endl;
+           }
+          
         }
         else { 
           ROS_ERROR_STREAM("Error: Failed to create " << tType << " turtle.");
