@@ -120,7 +120,8 @@ int num_turtles_updated = 0;
 int num_turtles = 0;
 vector<Turtle> xTurtles;			
 Turtle navTurtle; 					//Main turtle to track.
-
+double total_distance = 0;			//total distance traveled
+double time_it_took_walking = 0;	//total time it took when turtle was actually walking
 
 //Functions
 double degrees2radians(double angle_in_degrees);
@@ -438,10 +439,11 @@ int main(int argc, char ** argv)
 	//tree.printat(tree.root);
 
 	//-----Move the turtle-----
-	double height = 3.0;
-	double width = 3.0;
 	turtlesim::Pose start_pose = navTurtle.pose;
 	turtlesim::Pose goal_pose;
+
+	//start timer
+	double time_started = ros::Time::now().toSec();
 
 	for(int i = 0; i < tree.getPath().size(); i++)
 	{
@@ -538,6 +540,22 @@ int main(int argc, char ** argv)
 		goal_pose.y = tree.getPath()[i]->position.y();
 		move_goal(goal_pose);
 	}
+	//end timer
+	double time_ended = ros::Time::now().toSec();
+
+	//Total time it took
+	double time_it_took = time_ended - time_started;
+	cout << "Time it took: " << time_it_took << " seconds" << endl;
+	cout << "Time it took walking: " << time_it_took_walking << " seconds" << endl;
+
+	//Total Distance traveled
+	cout << "Total distance traveled: " << total_distance << endl; 
+
+	//Average velocity (counting in time turning)
+	cout << "Average Velocity (counting in time taken turning): " << (total_distance / time_it_took) << endl;
+
+	//Average velocity (not counting in time turning)
+	cout << "Average Velocity (only counting in time walking): " << (total_distance / time_it_took_walking) << endl;
 
 	//extra necessary stuff
 	loop_rate.sleep();
@@ -550,6 +568,10 @@ void move_goal (turtlesim::Pose goal_pose)
 {
 	geometry_msgs::Twist vel_msg; //The 'Twist' type is a message that the turtle understands
 	ros::Rate loop_rate(10);
+	double start_walk_time, end_walk_time; //For tracking time it took walking (for avg velocity only counting walking)
+
+	//For calculating total distance (assuming we only use move_goal() to move)
+	total_distance += getDistance(navTurtle.pose.x, navTurtle.pose.y, goal_pose.x, goal_pose.y);
 
 	//rotate the turtle first
 	do 
@@ -570,6 +592,8 @@ void move_goal (turtlesim::Pose goal_pose)
 	vel_msg.angular.z = 0;
 	velocity_publisher.publish(vel_msg);
 
+
+	start_walk_time = ros::Time::now().toSec();
 	//make the turtle walk
 	do 
 	{
@@ -583,8 +607,12 @@ void move_goal (turtlesim::Pose goal_pose)
 		loop_rate.sleep();
 
 		//chosen tolerance for linear velocity is 0.05
-	} while (getDistance(navTurtle.pose.x, navTurtle.pose.y, goal_pose.x, goal_pose.y) > .16);
-	
+	} while (getDistance(navTurtle.pose.x, navTurtle.pose.y, goal_pose.x, goal_pose.y) > .16);	
+	end_walk_time = ros::Time::now().toSec();
+
+	//track the time taken walking
+	time_it_took_walking += end_walk_time - start_walk_time;
+
 	//make the turtle stop
 	vel_msg.linear.x = 0;
 	vel_msg.angular.z = 0;
