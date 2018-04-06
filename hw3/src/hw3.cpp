@@ -116,8 +116,11 @@ ros::Subscriber pose_subscriber;   	//topic to get current turtle position is /t
 bool poseHasUpdated = false;		//Used to wait for initial pose data before moving
 const double PI = 3.14159265359;
 bool T_turtlesHasUpdated = false;
-int num_turtles_updated = 0;
-int num_turtles = 0;
+int num_Xturtles_updated = 0;
+int num_Tturtles_updated = 0;
+int num_Xturtles = 0;
+int num_Tturtles = 0;
+
 vector<Turtle> xTurtles;			
 Turtle navTurtle; 					//Main turtle to track.
 double total_distance = 0;			//total distance traveled
@@ -319,20 +322,21 @@ void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, Tree *tree, T
 		if(t->type == "T")
 		{
 			tree->add(NULL,t);
+			num_Tturtles_updated++;
 		}
 		else if(t->type == "X")
 		{
 			cout << "Added " << t->name << endl;
 			xTurtles.push_back(*t);
+			num_Xturtles_updated++;
 		}
 	}
 
 
-	if (num_turtles_updated >= num_turtles || T_turtlesHasUpdated) 
+	if (num_Tturtles_updated+num_Xturtles_updated >= num_Tturtles+num_Xturtles || T_turtlesHasUpdated) 
 	{
 		T_turtlesHasUpdated = true;
 	}
-	num_turtles_updated++;
 }
 
 int main(int argc, char ** argv)
@@ -351,7 +355,7 @@ int main(int argc, char ** argv)
 	ros::master::V_TopicInfo alltopics;
 	ros::master::getTopics(alltopics);
 
-	num_turtles = alltopics.size()-1;
+	//num_turtles = alltopics.size()-1;
 
 	Tree tree;
 	Turtle *t;//, *tx;
@@ -394,6 +398,7 @@ int main(int argc, char ** argv)
 				t->name = name_stream_T.str();
 				t->type = "T";
 				t->sub = n.subscribe<turtlesim::Pose>(topic_string_T, 10, boost::bind(get_all_turts, _1, &tree, t));
+				num_Tturtles++;
 			}
 
 
@@ -405,6 +410,7 @@ int main(int argc, char ** argv)
 				t->name = name_stream_X.str();
 				t->type = "X";
 				t->sub = n.subscribe<turtlesim::Pose>(topic_string_X, 10, boost::bind(get_all_turts, _1, &tree, t));
+				num_Xturtles++;
 			}	
 		}
 		
