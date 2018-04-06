@@ -174,16 +174,17 @@ double Turtle::h()
 		return 0;
 
 	double sum = 0.0;
-	double dot = 0.0;
+	double dot1 = 0.0, dot2 = 0.0;
 	xInTheWay.clear();
 	Turtle current = *parent;
 	for (int i = 0; i < xTurtles.size(); i++) {
 		//cout << name << ". Checking " << xTurtles[i].name << endl;
 		if (((xTurtles[i].position.x() <= current.position.x()+0.5 && xTurtles[i].position.x() >= position.x()-0.5) || (xTurtles[i].position.x() >= current.position.x()-0.5 && xTurtles[i].position.x() <= position.x()+0.5)) &&
 			((xTurtles[i].position.y() <= current.position.y()+0.5 && xTurtles[i].position.y() >= position.y()-0.5) || (xTurtles[i].position.y() >= current.position.y()-0.5 && xTurtles[i].position.y() <= position.y()+0.5))) {
-			dot = (xTurtles[i].position-current.position).normalize() * (position-current.position).normalize();
+			dot1 = (xTurtles[i].position-current.position).normalize() * (position-current.position).normalize();
+			dot2 = (current.position-xTurtles[i].position).normalize() * (current.position-position).normalize();
 
-			if(dot > 0.9)
+			if(dot1 > 0.85 || dot2 > 0.85)
 			{
 				sum += dot;
 				cout << xTurtles[i].name << " in the way: " << xTurtles[i].name <<"(" << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") "<< current.name << "(" << current.position.x() << "," << current.position.y() << ") " << name << "(" << position.x() << "," << position.y() << ")" << dot << endl;
