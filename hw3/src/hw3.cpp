@@ -6,9 +6,9 @@
 #include <sstream>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 using namespace std;
-//A lot of this stuff is based from 'wiki.ros.org/turtlesim' youtube video tutorials
 
 
 
@@ -184,15 +184,15 @@ double Turtle::h()
 			dot1 = (xTurtles[i].position-current.position).normalize() * (position-current.position).normalize();
 			dot2 = (current.position-xTurtles[i].position).normalize() * (current.position-position).normalize();
 
-			if(dot1 > 0.85 || dot2 > 0.85)
+			if(dot1 > 0.9 || dot2 > 0.9)
 			{
-				sum += dot;
-				cout << xTurtles[i].name << " in the way: " << xTurtles[i].name <<"(" << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") "<< current.name << "(" << current.position.x() << "," << current.position.y() << ") " << name << "(" << position.x() << "," << position.y() << ")" << dot << endl;
+				sum += max(dot1, dot2);
+				cout << xTurtles[i].name << " in the way: " << xTurtles[i].name <<"(" << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") "<< current.name << "(" << current.position.x() << "," << current.position.y() << ") " << name << "(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << endl;
 				xInTheWay.push_back(xTurtles[i]);
 			}
 			else
 			{
-				cout << xTurtles[i].name << "Not in the way: " << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") N(" << current.position.x() << "," << current.position.y() << ") T(" << position.x() << "," << position.y() << ")" << dot << endl;
+				cout << xTurtles[i].name << "Not in the way: " << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") N(" << current.position.x() << "," << current.position.y() << ") T(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << endl;
 			}
 			//cout << "\t" << xTurtles[i].name << "\n\tLHS: " << (xTurtles[i].position-current.position).normalize().x() << "," << (xTurtles[i].position-current.position).normalize().y() 
 			//	<< "\n\tRHS: " << (position-current.position).normalize().x() << "," << (position-current.position).normalize().y();
