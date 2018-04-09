@@ -177,22 +177,24 @@ double Turtle::h()
 	double dot1 = 0.0, dot2 = 0.0;
 	xInTheWay.clear();
 	Turtle current = *parent;
+	double dist = getDistance(current.position.x(),current.position.y(),position.x(),position.y());
 	for (int i = 0; i < xTurtles.size(); i++) {
 		//cout << name << ". Checking " << xTurtles[i].name << endl;
 		if (((xTurtles[i].position.x() <= current.position.x()+0.5 && xTurtles[i].position.x() >= position.x()-0.5) || (xTurtles[i].position.x() >= current.position.x()-0.5 && xTurtles[i].position.x() <= position.x()+0.5)) &&
 			((xTurtles[i].position.y() <= current.position.y()+0.5 && xTurtles[i].position.y() >= position.y()-0.5) || (xTurtles[i].position.y() >= current.position.y()-0.5 && xTurtles[i].position.y() <= position.y()+0.5))) {
 			dot1 = (xTurtles[i].position-current.position).normalize() * (position-current.position).normalize();
-			dot2 = (current.position-xTurtles[i].position).normalize() * (current.position-position).normalize();
-
-			if(dot1 > 0.9 || dot2 > 0.9)
+			dot2 = (xTurtles[i].position-position).normalize() * (current.position-position).normalize();
+			
+			double angleThreshold = dist/2/(sqrt(0.5*0.5+dist/2*dist/2)); //cos(angle between 2 vectors)=dot product/magnitude of vector1*magnitude of vector2
+			if(dot1 > angleThreshold || dot2 > angleThreshold)
 			{
 				sum += max(dot1, dot2);
-				cout << xTurtles[i].name << " in the way: " << xTurtles[i].name <<"(" << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") "<< current.name << "(" << current.position.x() << "," << current.position.y() << ") " << name << "(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << endl;
+				cout << xTurtles[i].name << " in the way: " << xTurtles[i].name <<"(" << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") "<< current.name << "(" << current.position.x() << "," << current.position.y() << ") " << name << "(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << " threshold " << angleThreshold << endl;
 				xInTheWay.push_back(xTurtles[i]);
 			}
 			else
 			{
-				cout << xTurtles[i].name << "Not in the way: " << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") N(" << current.position.x() << "," << current.position.y() << ") T(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << endl;
+				cout << xTurtles[i].name << "Not in the way: " << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") N(" << current.position.x() << "," << current.position.y() << ") T(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << " threshold " << angleThreshold << endl;
 			}
 			//cout << "\t" << xTurtles[i].name << "\n\tLHS: " << (xTurtles[i].position-current.position).normalize().x() << "," << (xTurtles[i].position-current.position).normalize().y() 
 			//	<< "\n\tRHS: " << (position-current.position).normalize().x() << "," << (position-current.position).normalize().y();
@@ -478,7 +480,8 @@ int main(int argc, char ** argv)
 				cout << "5" << endl;
 				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x()+1,tree.getPath()[i]->xInTheWay[j].position.y());
 				t->type = "X";
-				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0)
+				if((t->position.x() >= 0)&&(t->position.y() >= 0)&&(t->position.x() <= 11)&&(t->position.y() <= 11)
+				&&((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0))
 				{
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
@@ -489,7 +492,8 @@ int main(int argc, char ** argv)
 				t = new Turtle();
 				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x()-1,tree.getPath()[i]->xInTheWay[j].position.y());
 				t->type = "X";
-				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0)
+				if((t->position.x() >= 0)&&(t->position.y() >= 0)&&(t->position.x() <= 11)&&(t->position.y() <= 11)
+				&&((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0))
 				{
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
@@ -500,7 +504,8 @@ int main(int argc, char ** argv)
 				t = new Turtle();
 				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x(),tree.getPath()[i]->xInTheWay[j].position.y()+1);
 				t->type = "X";
-				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0)
+				if((t->position.x() >= 0)&&(t->position.y() >= 0)&&(t->position.x() <= 11)&&(t->position.y() <= 11)
+				&&((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0))
 				{
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
@@ -510,7 +515,8 @@ int main(int argc, char ** argv)
 				t = new Turtle();
 				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x(),tree.getPath()[i]->xInTheWay[j].position.y()-1);
 				t->type = "X";
-				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0)
+				if((t->position.x() >= 0)&&(t->position.y() >= 0)&&(t->position.x() <= 11)&&(t->position.y() <= 11)
+				&&((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0))
 				{
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
