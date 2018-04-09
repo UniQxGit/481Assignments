@@ -122,6 +122,7 @@ int num_Tturtles_updated = 0;
 int num_Xturtles = 0;
 int num_Tturtles = 0;
 
+vector<Turtle> tTurtles;			//track turtles for destruction
 vector<Turtle> xTurtles;			
 Turtle navTurtle; 					//Main turtle to track.
 double total_distance = 0;			//total distance traveled
@@ -179,24 +180,23 @@ double Turtle::h()
 	double dot1 = 0.0, dot2 = 0.0;
 	xInTheWay.clear();
 	Turtle current = *parent;
-	double dist = getDistance(current.position.x(),current.position.y(),position.x(),position.y());
 	for (int i = 0; i < xTurtles.size(); i++) {
 		//cout << name << ". Checking " << xTurtles[i].name << endl;
 		if (((xTurtles[i].position.x() <= current.position.x()+0.5 && xTurtles[i].position.x() >= position.x()-0.5) || (xTurtles[i].position.x() >= current.position.x()-0.5 && xTurtles[i].position.x() <= position.x()+0.5)) &&
 			((xTurtles[i].position.y() <= current.position.y()+0.5 && xTurtles[i].position.y() >= position.y()-0.5) || (xTurtles[i].position.y() >= current.position.y()-0.5 && xTurtles[i].position.y() <= position.y()+0.5))) {
 			dot1 = (xTurtles[i].position-current.position).normalize() * (position-current.position).normalize();
-			dot2 = (xTurtles[i].position-position).normalize() * (current.position-position).normalize();
-			
-			double angleThreshold = dist/2/(sqrt(0.5*0.5+dist/2*dist/2)); //cos(angle between 2 vectors)=dot product/magnitude of vector1*magnitude of vector2
-			if(dot1 > angleThreshold || dot2 > angleThreshold)
+			dot2 = (current.position-xTurtles[i].position).normalize() * (current.position-position).normalize();
+
+			if(dot1 > 0.8 || getDistance(navTurtle.position.x(),navTurtle.position.y(),xTurtles[i].position.x(),xTurtles[i].position.y()) < 1.0)
 			{
 				sum += max(dot1, dot2);
-				cout << xTurtles[i].name << " in the way: " << xTurtles[i].name <<"(" << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") "<< current.name << "(" << current.position.x() << "," << current.position.y() << ") " << name << "(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << " threshold " << angleThreshold << endl;
-				xInTheWay.push_back(xTurtles[i]);
+				cout << "Dot1: " << dot1 << " Dot2: " << dot2 << "Distance" << getDistance(navTurtle.position.x(),navTurtle.position.y(),xTurtles[i].position.x(),xTurtles[i].position.y()) << endl;
+				cout << xTurtles[i].name << " in the way: " << xTurtles[i].name <<"(" << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") "<< current.name << "(" << current.position.x() << "," << current.position.y() << ") " << name << "(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << endl;
+				xInTheWay.push_back(xTurtles[i]);	
 			}
 			else
 			{
-				cout << xTurtles[i].name << "Not in the way: " << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") N(" << current.position.x() << "," << current.position.y() << ") T(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << " threshold " << angleThreshold << endl;
+				cout << xTurtles[i].name << "Not in the way: " << xTurtles[i].position.x() << "," << xTurtles[i].position.y() << ") N(" << current.position.x() << "," << current.position.y() << ") T(" << position.x() << "," << position.y() << ")" << max(dot1, dot2) << endl;
 			}
 			//cout << "\t" << xTurtles[i].name << "\n\tLHS: " << (xTurtles[i].position-current.position).normalize().x() << "," << (xTurtles[i].position-current.position).normalize().y() 
 			//	<< "\n\tRHS: " << (position-current.position).normalize().x() << "," << (position-current.position).normalize().y();
@@ -327,6 +327,7 @@ void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, Tree *tree, T
 		if(t->type == "T")
 		{
 			tree->add(NULL,t);
+			tTurtles.push_back(*t);
 			num_Tturtles_updated++;
 		}
 		else if(t->type == "X")
@@ -375,6 +376,7 @@ int main(int argc, char ** argv)
 
 	//For killing turtles
 	kClient = n.serviceClient<turtlesim::Kill>("kill");
+
 	//num_turtles = alltopics.size()-1;
 
 	Tree tree;
@@ -478,51 +480,43 @@ int main(int argc, char ** argv)
 		{
 			Tree avoid;
 
-			cout << "0" << endl;
 			Turtle dest = *tree.getPath()[i];
-			cout << "1" << endl;
 			//avoid.add(NULL,&dest);
-			cout << "2" << endl;
 			Turtle start = *tree.getPath()[(i>0?i-1:0)];
-			cout << "3" << endl;
 			start.parent = &dest;
 			avoid.root.position.set(start.position.x(),start.position.y());
-			cout << "4" << endl;
 
 			for(int j = 0; j < tree.getPath()[i]->xInTheWay.size(); j++)
 			{
 				Turtle *t;
 
 				t = new Turtle();
-				cout << "5" << endl;
 				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x()+1,tree.getPath()[i]->xInTheWay[j].position.y());
 				t->type = "X";
-				if((t->position.x() >= 0)&&(t->position.y() >= 0)&&(t->position.x() <= 11)&&(t->position.y() <= 11)
-				&&((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0))
+				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0 &&
+					tree.getPath()[i]->xInTheWay[j].position.x()+1 <= 11)
 				{
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
 				}
-				cout << "5" << endl;
 				//parent->children.push_back(t);
 
 				t = new Turtle();
 				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x()-1,tree.getPath()[i]->xInTheWay[j].position.y());
 				t->type = "X";
-				if((t->position.x() >= 0)&&(t->position.y() >= 0)&&(t->position.x() <= 11)&&(t->position.y() <= 11)
-				&&((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0))
+				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0 &&
+					tree.getPath()[i]->xInTheWay[j].position.x()-1 >= 0)
 				{
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
 				}
-				cout << "6" << endl;
 				//parent->children.push_back(t);
 
 				t = new Turtle();
 				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x(),tree.getPath()[i]->xInTheWay[j].position.y()+1);
 				t->type = "X";
-				if((t->position.x() >= 0)&&(t->position.y() >= 0)&&(t->position.x() <= 11)&&(t->position.y() <= 11)
-				&&((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0))
+				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0 &&
+					tree.getPath()[i]->xInTheWay[j].position.y()+1 <= 11)
 				{
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
@@ -532,8 +526,8 @@ int main(int argc, char ** argv)
 				t = new Turtle();
 				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x(),tree.getPath()[i]->xInTheWay[j].position.y()-1);
 				t->type = "X";
-				if((t->position.x() >= 0)&&(t->position.y() >= 0)&&(t->position.x() <= 11)&&(t->position.y() <= 11)
-				&&((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0))
+				if((t->position - start.position).normalize() * (tree.getPath()[i]->position - start.position).normalize() > 0 &&
+					tree.getPath()[i]->xInTheWay[j].position.y()-1 >= 0)
 				{
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
@@ -569,9 +563,6 @@ int main(int argc, char ** argv)
 		goal_pose.x = tree.getPath()[i]->position.x();
 		goal_pose.y = tree.getPath()[i]->position.y();
 		move_goal(goal_pose);
-
-		kill_turtle(tree.getPath()[i]->name);
-		//tree.getPath()[i]->kill();
 	}
 	//end timer
 	double time_ended = ros::Time::now().toSec();
@@ -585,17 +576,10 @@ int main(int argc, char ** argv)
 	cout << "Total distance traveled: " << total_distance << endl; 
 
 	//Average velocity (counting in time turning)
-	cout << "Average Velocity (distance per second) (counting in time taken turning): " << (total_distance / time_it_took) << endl;
+	cout << "Average Velocity (counting in time taken turning): " << (total_distance / time_it_took) << endl;
 
 	//Average velocity (not counting in time turning)
-	cout << "Average Velocity (distance per second) (only counting in time walking): " << (total_distance / time_it_took_walking) << endl;
-
-	//T turtles eaten
-	cout << "T turtles eaten in order: " << endl;
-	for (int i = 0; i < tree.getPath().size(); i++) 
-	{
-		cout << tree.getPath()[i]->name << " " << endl;
-	}
+	cout << "Average Velocity (only counting in time walking): " << (total_distance / time_it_took_walking) << endl;
 
 	//extra necessary stuff
 	loop_rate.sleep();
@@ -647,7 +631,7 @@ void move_goal (turtlesim::Pose goal_pose)
 		loop_rate.sleep();
 
 		//chosen tolerance for linear velocity is 0.05
-	} while (getDistance(navTurtle.pose.x, navTurtle.pose.y, goal_pose.x, goal_pose.y) > .16);	
+	} while (getDistance(navTurtle.pose.x, navTurtle.pose.y, goal_pose.x, goal_pose.y) > .05);	
 	end_walk_time = ros::Time::now().toSec();
 
 	//track the time taken walking
@@ -704,6 +688,15 @@ void poseCallback(const turtlesim::Pose::ConstPtr & pose_message)
 	navTurtle.pose.theta = pose_message->theta;
 
 	navTurtle.position.set(pose_message->x,pose_message->y);
+
+	for (int i = 0; i < tTurtles.size(); i++)
+	{
+		if (getDistance(navTurtle.position.x(),navTurtle.position.y(),tTurtles[i].position.x(),tTurtles[i].position.y()) <= 0.5)
+		{
+			kill_turtle(tTurtles[i].name);
+			tTurtles.erase(tTurtles.begin()+i);
+		}
+	}
 }
 
 //-------helper functions-------

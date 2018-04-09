@@ -82,8 +82,7 @@ struct Turtle {
 	double fValue;
 	ros::Subscriber sub;
 	turtlesim::Pose pose;
-	Vector2 position; 					 //right now this is the 0.5 offset for T turtles
-	Vector2 true_position;				 //the real position of the turtle
+	Vector2 position;
 
 
 	Turtle *parent;
@@ -123,6 +122,7 @@ int num_Tturtles_updated = 0;
 int num_Xturtles = 0;
 int num_Tturtles = 0;
 
+vector<Turtle> tTurtles;			//track turtles for destruction
 vector<Turtle> xTurtles;			
 Turtle navTurtle; 					//Main turtle to track.
 double total_distance = 0;			//total distance traveled
@@ -135,7 +135,6 @@ void rotate (double angular_speed, double relative_angle, double linearSpeed, bo
 void poseCallback(const turtlesim::Pose::ConstPtr & pose_message);
 double getDistance(double x1, double y1, double x2, double y2);
 void move_goal (turtlesim::Pose goal_pose);
-Vector2 getpoint5_point (double start_point_x, double start_point_y, double goal_point_x, double goal_point_y);
 
 void Vector2::set(double x, double y)
 {
@@ -296,20 +295,8 @@ void Tree::setPath()
 			}
 		}
 
-		//Deciding on best path
 		if(minIndex >= 0)
 		{
-			//Doing the 0.5 offset
-			Vector2 offset_point = getpoint5_point(current->position.x(), current->position.y(), current->children[minIndex]->position.x(), current->children[minIndex]->position.y());
-			current->children[minIndex]->true_position = current->children[minIndex]->position;
-
-			//our new goal is to reach these new 0.5 offset locations rather than the exact point
-			//make sure we're only doing this to T turtles
-			if (current->children[minIndex]->type == "T") {
-				current->children[minIndex]->position.set(offset_point.x(), offset_point.y());
-			}
-			
-
 			path.push_back(current->children[minIndex]);
 			current = current->children[minIndex];
 			cout << "Path " << i << ": " << current->name << " F=" << current->f() << " (" << current->position.x() << "," << current->position.y() << ")" 
@@ -341,6 +328,7 @@ void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, Tree *tree, T
 		if(t->type == "T")
 		{
 			tree->add(NULL,t);
+			tTurtles.push_back(*t);
 			num_Tturtles_updated++;
 		}
 		else if(t->type == "X")
@@ -487,28 +475,22 @@ int main(int argc, char ** argv)
 
 	for(int i = 0; i < tree.getPath().size(); i++)
 	{
-		cout << "Moving Around " << tree.getPath()[i]->name << endl;
+		cout << "Moving To " << tree.getPath()[i]->name << endl;
 		if(tree.getPath()[i]->xInTheWay.size()>0)
 		{
 			Tree avoid;
 
-			cout << "0" << endl;
 			Turtle dest = *tree.getPath()[i];
-			cout << "1" << endl;
 			//avoid.add(NULL,&dest);
-			cout << "2" << endl;
 			Turtle start = *tree.getPath()[(i>0?i-1:0)];
-			cout << "3" << endl;
 			start.parent = &dest;
 			avoid.root.position.set(start.position.x(),start.position.y());
-			cout << "4" << endl;
 
 			for(int j = 0; j < tree.getPath()[i]->xInTheWay.size(); j++)
 			{
 				Turtle *t;
 
 				t = new Turtle();
-				cout << "5" << endl;
 				t->position = Vector2(tree.getPath()[i]->xInTheWay[j].position.x()+1,tree.getPath()[i]->xInTheWay[j].position.y());
 				t->type = "X";
 				if((t->position.x() >= 0)&&(t->position.y() >= 0)&&(t->position.x() <= 11)&&(t->position.y() <= 11)
@@ -517,7 +499,6 @@ int main(int argc, char ** argv)
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
 				}
-				cout << "5" << endl;
 				//parent->children.push_back(t);
 
 				t = new Turtle();
@@ -529,7 +510,6 @@ int main(int argc, char ** argv)
 					cout << "Adding " << t->position.x() << "," << t->position.y() << endl;
 					avoid.add(NULL,t);
 				}
-				cout << "6" << endl;
 				//parent->children.push_back(t);
 
 				t = new Turtle();
@@ -572,7 +552,6 @@ int main(int argc, char ** argv)
 				if((avoid.getPath()[j]->position - dest.parent->position) * (dest.position - dest.parent->position) > 0
 					&& avoid.getPath()[j]->hValue == 0)
 				{
-					
 					goal_pose.x = avoid.getPath()[j]->position.x();
 					goal_pose.y = avoid.getPath()[j]->position.y();
 					move_goal(goal_pose);
@@ -581,14 +560,10 @@ int main(int argc, char ** argv)
 			}
 
 		}
-
-		cout << "Going to (" << tree.getPath()[i]->position.x() << ", " << tree.getPath()[i]->position.y() << ") " << endl;
-
-		//Trying the offset 0.5 way
 		goal_pose.x = tree.getPath()[i]->position.x();
 		goal_pose.y = tree.getPath()[i]->position.y();
 		move_goal(goal_pose);
-		kill_turtle(tree.getPath()[i]->name);
+		//tree.getPath()[i]->kill();
 	}
 	//end timer
 	double time_ended = ros::Time::now().toSec();
@@ -664,7 +639,7 @@ void move_goal (turtlesim::Pose goal_pose)
 		loop_rate.sleep();
 
 		//chosen tolerance for linear velocity is 0.05
-	} while (getDistance(navTurtle.pose.x, navTurtle.pose.y, goal_pose.x, goal_pose.y) > .05);	
+	} while (getDistance(navTurtle.pose.x, navTurtle.pose.y, goal_pose.x, goal_pose.y) > .16);	
 	end_walk_time = ros::Time::now().toSec();
 
 	//track the time taken walking
@@ -721,6 +696,15 @@ void poseCallback(const turtlesim::Pose::ConstPtr & pose_message)
 	navTurtle.pose.theta = pose_message->theta;
 
 	navTurtle.position.set(pose_message->x,pose_message->y);
+
+	for (int i = 0; i < tTurtles.size(); i++)
+	{
+		if (getDistance(navTurtle.position.x(),navTurtle.position.y(),tTurtles[i].position.x(),tTurtles[i].position.y()) <= 0.5)
+		{
+			kill_turtle(tTurtles[i].name);
+			tTurtles.erase(tTurtles.begin()+i);
+		}
+	}
 }
 
 //-------helper functions-------
@@ -732,22 +716,3 @@ double getDistance(double x1, double y1, double x2, double y2)
 double degrees2radians(double angle_in_degrees){
 	return angle_in_degrees *PI /180.0;
 }
-
-
-//Given two points (point A and point B) in 2D space, find the point inbetween A and B that is 0.5 away from point B
-//A = start_point, B = goal_point
-Vector2 getpoint5_point (double start_point_x, double start_point_y, double goal_point_x, double goal_point_y)
-{
-	Vector2 in_between_point;
-	double dist_ratio;
-	double point5away_x;
-	double point5away_y;
-
-	dist_ratio = 0.5 / (getDistance(start_point_x, start_point_y, goal_point_x, goal_point_y));
-	point5away_x = ((1 - dist_ratio)*goal_point_x + (dist_ratio)*start_point_x);
-	point5away_y = ((1 - dist_ratio)*goal_point_y + (dist_ratio)*start_point_y);
-
-
-	in_between_point.set(point5away_x, point5away_y);
-	return in_between_point;
-} 
