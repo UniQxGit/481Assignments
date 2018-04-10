@@ -590,6 +590,13 @@ int main(int argc, char ** argv)
 	//Average velocity (not counting in time turning)
 	cout << "Average Velocity (distance per second) (only counting in time walking): " << (total_distance / time_it_took_walking) << endl;
 
+	//T turtles eaten
+	cout << "T turtles eaten in order: " << endl;
+	for (int i = 0; i < tree.getPath().size(); i++) 
+	{
+		cout << tree.getPath()[i]->name << " " << endl;
+	}
+
 	//extra necessary stuff
 	loop_rate.sleep();
 	ros::spin();
