@@ -207,6 +207,10 @@ target_link_libraries(hw3test ${catkin_LIBRARIES})
 add_executable(hw3 src/hw3.cpp)
 target_link_libraries(hw3 ${catkin_LIBRARIES})
 
+#hw3version2.cpp
+add_executable(hw3version2 src/hw3version2.cpp)
+target_link_libraries(hw3version2 ${catkin_LIBRARIES})
+
 #controlled_test.cpp
 add_executable(controlled_test src/controlled_test.cpp)
 target_link_libraries(controlled_test ${catkin_LIBRARIES})
