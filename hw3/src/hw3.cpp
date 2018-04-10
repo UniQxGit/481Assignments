@@ -1,6 +1,7 @@
 #include "ros/ros.h"
 #include "geometry_msgs/Twist.h"
 #include "turtlesim/Pose.h"
+#include <turtlesim/Kill.h>
 #include "boost/bind.hpp"
 
 #include <sstream>
@@ -125,6 +126,7 @@ vector<Turtle> xTurtles;
 Turtle navTurtle; 					//Main turtle to track.
 double total_distance = 0;			//total distance traveled
 double time_it_took_walking = 0;	//total time it took when turtle was actually walking
+ros::ServiceClient kClient;			//service client for killing turtles
 
 //Functions
 double degrees2radians(double angle_in_degrees);
@@ -342,6 +344,19 @@ void get_all_turts(const turtlesim::Pose::ConstPtr & pose_message, Tree *tree, T
 	}
 }
 
+//using hw3test.cpp as a reference
+void kill_turtle(string victim_name) 
+{
+	turtlesim::Kill::Request reqk;
+	turtlesim::Kill::Response respk;
+
+	reqk.name = victim_name;
+	if (!kClient.call(reqk, respk))
+    	ROS_ERROR_STREAM("Error: Failed to kill " << reqk.name.c_str() << "\n");
+  	else
+    	ROS_INFO_STREAM("Just ate " << victim_name << "\n");
+}
+
 int main(int argc, char ** argv)
 {
 	std::cout << "beginning hw3" << std::endl;
@@ -358,6 +373,8 @@ int main(int argc, char ** argv)
 	ros::master::V_TopicInfo alltopics;
 	ros::master::getTopics(alltopics);
 
+	//For killing turtles
+	kClient = n.serviceClient<turtlesim::Kill>("kill");
 	//num_turtles = alltopics.size()-1;
 
 	Tree tree;
@@ -552,6 +569,9 @@ int main(int argc, char ** argv)
 		goal_pose.x = tree.getPath()[i]->position.x();
 		goal_pose.y = tree.getPath()[i]->position.y();
 		move_goal(goal_pose);
+
+		kill_turtle(tree.getPath()[i]->name);
+		//tree.getPath()[i]->kill();
 	}
 	//end timer
 	double time_ended = ros::Time::now().toSec();
@@ -565,10 +585,10 @@ int main(int argc, char ** argv)
 	cout << "Total distance traveled: " << total_distance << endl; 
 
 	//Average velocity (counting in time turning)
-	cout << "Average Velocity (counting in time taken turning): " << (total_distance / time_it_took) << endl;
+	cout << "Average Velocity (distance per second) (counting in time taken turning): " << (total_distance / time_it_took) << endl;
 
 	//Average velocity (not counting in time turning)
-	cout << "Average Velocity (only counting in time walking): " << (total_distance / time_it_took_walking) << endl;
+	cout << "Average Velocity (distance per second) (only counting in time walking): " << (total_distance / time_it_took_walking) << endl;
 
 	//extra necessary stuff
 	loop_rate.sleep();
